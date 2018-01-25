@@ -21,8 +21,10 @@ from __future__ import print_function
 import numpy as np
 
 from tensorflow.python.keras._impl.keras.utils.data_utils import get_file
+from tensorflow.python.util.tf_export import tf_export
 
 
+@tf_export('keras.datasets.boston_housing.load_data')
 def load_data(path='boston_housing.npz', seed=113, test_split=0.2):
   """Loads the Boston Housing dataset.
 
@@ -48,7 +50,7 @@ def load_data(path='boston_housing.npz', seed=113, test_split=0.2):
   f.close()
 
   np.random.seed(seed)
-  indices = np.arrange(len(x))
+  indices = np.arange(len(x))
   np.random.shuffle(indices)
   x = x[indices]
   y = y[indices]

@@ -47,23 +47,28 @@ from tensorflow.core.protobuf import rewriter_config_pb2
 from tensorflow.python import pywrap_tensorflow
 from tensorflow.python.client import device_lib
 from tensorflow.python.client import session
+from tensorflow.python.eager import backprop
 from tensorflow.python.eager import context
 from tensorflow.python.eager import tape
 from tensorflow.python.framework import device as pydev
+from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import errors
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import random_seed
 from tensorflow.python.framework import versions
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import resource_variable_ops
+from tensorflow.python.ops import variables
 from tensorflow.python.platform import googletest
 from tensorflow.python.platform import tf_logging as logging
 from tensorflow.python.training import server_lib
 from tensorflow.python.util import compat
 from tensorflow.python.util import nest
 from tensorflow.python.util.protobuf import compare
+from tensorflow.python.util.tf_export import tf_export
 
 
+@tf_export("test.gpu_device_name")
 def gpu_device_name():
   """Returns the name of a GPU device if available or the empty string."""
   for x in device_lib.list_local_devices():
@@ -98,6 +103,7 @@ def assert_ops_in_graph(expected_ops, graph):
   return actual_ops
 
 
+@tf_export("test.assert_equal_graph_def")
 def assert_equal_graph_def(actual, expected, checkpoint_v2=False):
   """Asserts that two `GraphDef`s are (mostly) the same.
 
@@ -159,6 +165,16 @@ def assert_meta_graph_protos_equal(tester, a, b):
   # proto comparison below.
   a.ClearField("collection_def")
   b.ClearField("collection_def")
+
+  # Check the graph_defs.
+  assert_equal_graph_def(a.graph_def, b.graph_def, checkpoint_v2=True)
+  # Check graph_def versions (ignored by assert_equal_graph_def).
+  tester.assertProtoEquals(a.graph_def.versions, b.graph_def.versions)
+  # Compared the fields directly, remove their raw values from the
+  # proto comparison below.
+  a.ClearField("graph_def")
+  b.ClearField("graph_def")
+
   tester.assertProtoEquals(a, b)
 
 
@@ -175,7 +191,7 @@ def _strip_checkpoint_v2_randomized(graph_def):
       if attr_tensor_value and len(attr_tensor_value.string_val) == 1:
         attr_tensor_string_value = attr_tensor_value.string_val[0]
         if (attr_tensor_string_value and
-            re.match(_SHARDED_SAVE_OP_PATTERN, attr_tensor_string_value)):
+            re.match(_SHARDED_SAVE_OP_PATTERN, str(attr_tensor_string_value))):
           delete_keys.append(attr_key)
     for attr_key in delete_keys:
       del node.attr[attr_key]
@@ -187,6 +203,10 @@ def IsGoogleCudaEnabled():
 
 def CudaSupportsHalfMatMulAndConv():
   return pywrap_tensorflow.CudaSupportsHalfMatMulAndConv()
+
+
+def InstallStackTraceHandler():
+  pywrap_tensorflow.InstallStacktraceHandler()
 
 
 def NHWCToNCHW(input_tensor):
@@ -454,6 +474,62 @@ class IsolateTest(object):
         type_arg, value_arg, traceback_arg)
 
 
+def assert_no_new_tensors(f):
+  """Decorator for asserting that no new Tensors persist after a test.
+
+  Mainly useful for checking that code using the Python C API has correctly
+  manipulated reference counts.
+
+  Clears the caches that it knows about, runs the garbage collector, then checks
+  that there are no Tensor or Tensor-like objects still around. This includes
+  Tensors to which something still has a reference (e.g. from missing
+  Py_DECREFs) and uncollectable cycles (i.e. Python reference cycles where one
+  of the objects has __del__ defined).
+
+  Args:
+    f: The test case to run.
+  Returns:
+    The decorated test case.
+  """
+
+  def decorator(self, **kwargs):
+    """Finds existing Tensors, runs the test, checks for new Tensors."""
+
+    def _is_tensor(obj):
+      try:
+        return (isinstance(obj, ops.Tensor) or
+                isinstance(obj, variables.Variable))
+      except ReferenceError:
+        # If the object no longer exists, we don't care about it.
+        return False
+
+    tensors_before = set(id(obj) for obj in gc.get_objects() if _is_tensor(obj))
+    outside_container_prefix = ops.get_default_graph()._container_prefix
+    with IsolateTest():
+      # Run the test in a new graph so that collections get cleared when it's
+      # done, but inherit the container prefix so that we can print the values
+      # of variables which get leaked when executing eagerly.
+      ops.get_default_graph()._container_prefix = outside_container_prefix
+      f(self, **kwargs)
+    # Make an effort to clear caches, which would otherwise look like leaked
+    # Tensors.
+    backprop._last_zero = [None]
+    backprop._shape_dtype = [None, None]
+    context.get_default_context().scalar_cache().clear()
+    gc.collect()
+    tensors_after = [
+        obj for obj in gc.get_objects()
+        if _is_tensor(obj) and id(obj) not in tensors_before
+    ]
+    if tensors_after:
+      raise AssertionError(("%d Tensors not deallocated after test: %s" % (
+          len(tensors_after),
+          str(tensors_after),
+      )))
+
+  return decorator
+
+
 def assert_no_garbage_created(f):
   """Test method decorator to assert that no garbage has been created.
 
@@ -508,7 +584,8 @@ def run_in_graph_and_eager_modes(
       garbage for legitimate reasons (e.g. they define a class which inherits
       from `object`), and because DEBUG_SAVEALL is sticky in some Python
       interpreters (meaning that tests which rely on objects being collected
-      elsewhere in the unit test file will not work).
+      elsewhere in the unit test file will not work). Additionally, checks that
+      nothing still has a reference to Tensors that the test allocated.
   Returns:
     Returns a decorator that will run the decorated test function
         using both a graph and using eager execution.
@@ -545,7 +622,8 @@ def run_in_graph_and_eager_modes(
             f(self, **kwargs)
 
       if assert_no_eager_garbage:
-        run_eager_mode = assert_no_garbage_created(run_eager_mode)
+        run_eager_mode = assert_no_new_tensors(
+            assert_no_garbage_created(run_eager_mode))
 
       with context.eager_mode():
         with IsolateTest():
@@ -555,6 +633,7 @@ def run_in_graph_and_eager_modes(
   return decorator
 
 
+@tf_export("test.is_gpu_available")
 def is_gpu_available(cuda_only=False, min_cuda_compute_capability=None):
   """Returns whether TensorFlow can access a GPU.
 
@@ -603,6 +682,7 @@ def device(use_gpu):
     yield
 
 
+@tf_export("test.TestCase")
 class TensorFlowTestCase(googletest.TestCase):
   """Base class for tests that need to test TensorFlow.
   """
@@ -1050,37 +1130,90 @@ class TensorFlowTestCase(googletest.TestCase):
       print("not close dif = ", np.abs(x - y))
       print("not close tol = ", atol + rtol * np.abs(y))
       print("dtype = %s, shape = %s" % (a.dtype, a.shape))
-      np.testing.assert_allclose(a, b, rtol=rtol, atol=atol, err_msg=msg)
+      # TODO(xpan): There seems to be a bug:
+      # tensorflow/compiler/tests:binary_ops_test pass with float32
+      # nan even though the equal_nan is False by default internally.
+      np.testing.assert_allclose(
+          a, b, rtol=rtol, atol=atol, err_msg=msg, equal_nan=True)
+
+  def _assertAllCloseRecursive(self, a, b, rtol=1e-6, atol=1e-6, path=None):
+    path = path or []
+    path_str = (("[" + "][".join([str(p) for p in path]) + "]") if path else "")
+
+    # Check if a and/or b are namedtuples.
+    if hasattr(a, "_asdict"):
+      a = a._asdict()
+    if hasattr(b, "_asdict"):
+      b = b._asdict()
+    a_is_dict = isinstance(a, dict)
+    if a_is_dict != isinstance(b, dict):
+      raise ValueError("Can't compare dict to non-dict, a%s vs b%s." %
+                       (path_str, path_str))
+    if a_is_dict:
+      self.assertItemsEqual(
+          a.keys(),
+          b.keys(),
+          msg="mismatched keys: a%s has keys %s, but b%s has keys %s" %
+          (path_str, a.keys(), path_str, b.keys()))
+      for k in a:
+        path.append(k)
+        self._assertAllCloseRecursive(
+            a[k], b[k], rtol=rtol, atol=atol, path=path)
+        del path[-1]
+    elif isinstance(a, (list, tuple)):
+      # Try to directly compare a, b as ndarrays; if not work, then traverse
+      # through the sequence, which is more expensive.
+      try:
+        a_as_ndarray = np.array(a)
+        b_as_ndarray = np.array(b)
+        self._assertArrayLikeAllClose(
+            a_as_ndarray,
+            b_as_ndarray,
+            rtol=rtol,
+            atol=atol,
+            msg="Mismatched value: a%s is different from b%s." % (path_str,
+                                                                  path_str))
+      except (ValueError, TypeError) as e:
+        if len(a) != len(b):
+          raise ValueError(
+              "Mismatched length: a%s has %d items, but b%s has %d items" %
+              (path_str, len(a), path_str, len(b)))
+        for idx, (a_ele, b_ele) in enumerate(zip(a, b)):
+          path.append(str(idx))
+          self._assertAllCloseRecursive(
+              a_ele, b_ele, rtol=rtol, atol=atol, path=path)
+          del path[-1]
+    # a and b are ndarray like objects
+    else:
+      self._assertArrayLikeAllClose(
+          a,
+          b,
+          rtol=rtol,
+          atol=atol,
+          msg="Mismatched value: a%s is different from b%s." % (path_str,
+                                                                path_str))
 
   def assertAllClose(self, a, b, rtol=1e-6, atol=1e-6):
-    """Asserts that two numpy arrays, or dicts of same, have near values.
+    """Asserts that two structures of numpy arrays, have near values.
 
-    This does not support nested dicts.
+    `a` and `b` can be arbitrarily nested structures. A layer of a nested
+    structure can be a `dict`, `namedtuple`, `tuple` or `list`.
 
     Args:
-      a: The expected numpy ndarray (or anything can be converted to one), or
-        dict of same. Must be a dict iff `b` is a dict.
-      b: The actual numpy ndarray (or anything can be converted to one), or
-        dict of same. Must be a dict iff `a` is a dict.
+      a: The expected numpy `ndarray`, or anything that can be converted into a
+          numpy `ndarray`, or any arbitrarily nested of structure of these.
+      b: The actual numpy `ndarray`, or anything that can be converted into a
+          numpy `ndarray`, or any arbitrarily nested of structure of these.
       rtol: relative tolerance.
       atol: absolute tolerance.
 
     Raises:
-      ValueError: if only one of `a` and `b` is a dict.
+      ValueError: if only one of `a[p]` and `b[p]` is a dict or
+          `a[p]` and `b[p]` have different length, where `[p]` denotes a path
+          to the nested structure, e.g. given `a = [(1, 1), {'d': (6, 7)}]` and
+          `[p] = [1]['d']`, then `a[p] = (6, 7)`.
     """
-    is_a_dict = isinstance(a, dict)
-    if is_a_dict != isinstance(b, dict):
-      raise ValueError("Can't compare dict to non-dict, %s vs %s." % (a, b))
-    if is_a_dict:
-      self.assertItemsEqual(
-          a.keys(), b.keys(),
-          msg="mismatched keys, expected %s, got %s" % (a.keys(), b.keys()))
-      for k in a:
-        self._assertArrayLikeAllClose(
-            a[k], b[k], rtol=rtol, atol=atol,
-            msg="%s: expected %s, got %s." % (k, a, b))
-    else:
-      self._assertArrayLikeAllClose(a, b, rtol=rtol, atol=atol)
+    self._assertAllCloseRecursive(a, b, rtol=rtol, atol=atol)
 
   def assertAllCloseAccordingToType(self,
                                     a,
@@ -1090,7 +1223,9 @@ class TensorFlowTestCase(googletest.TestCase):
                                     float_rtol=1e-6,
                                     float_atol=1e-6,
                                     half_rtol=1e-3,
-                                    half_atol=1e-3):
+                                    half_atol=1e-3,
+                                    bfloat16_rtol=1e-2,
+                                    bfloat16_atol=1e-2):
     """Like assertAllClose, but also suitable for comparing fp16 arrays.
 
     In particular, the tolerance is reduced to 1e-3 if at least
@@ -1105,9 +1240,12 @@ class TensorFlowTestCase(googletest.TestCase):
       float_atol: absolute tolerance for float32.
       half_rtol: relative tolerance for float16.
       half_atol: absolute tolerance for float16.
+      bfloat16_rtol: relative tolerance for bfloat16.
+      bfloat16_atol: absolute tolerance for bfloat16.
     """
     a = self._GetNdArray(a)
     b = self._GetNdArray(b)
+    # types with lower tol are put later to overwrite previous ones.
     if (a.dtype == np.float32 or b.dtype == np.float32 or
         a.dtype == np.complex64 or b.dtype == np.complex64):
       rtol = max(rtol, float_rtol)
@@ -1115,6 +1253,10 @@ class TensorFlowTestCase(googletest.TestCase):
     if a.dtype == np.float16 or b.dtype == np.float16:
       rtol = max(rtol, half_rtol)
       atol = max(atol, half_atol)
+    if (a.dtype == dtypes.bfloat16.as_numpy_dtype or
+        b.dtype == dtypes.bfloat16.as_numpy_dtype):
+      rtol = max(rtol, bfloat16_rtol)
+      atol = max(atol, bfloat16_atol)
 
     self.assertAllClose(a, b, rtol=rtol, atol=atol)
 
@@ -1236,6 +1378,7 @@ class TensorFlowTestCase(googletest.TestCase):
     # pylint: enable=invalid-name
 
 
+@tf_export("test.create_local_cluster")
 def create_local_cluster(num_workers, num_ps, protocol="grpc",
                          worker_config=None, ps_config=None):
   """Create and start local servers and return the associated `Server` objects.
@@ -1299,3 +1442,21 @@ def create_local_cluster(num_workers, num_ps, protocol="grpc",
   ]
 
   return workers, ps_servers
+
+
+def get_node_def_from_graph(node_name, graph_def):
+  """Returns the `NodeDef` instance for given node name in the graph def.
+
+  This method explores only the NodeDefs in `graph_def.node`.
+
+  Args:
+    node_name: Name of the NodeDef to search for.
+    graph_def: An instance of `GraphDef` proto.
+
+  Returns:
+    the `NodeDef` instance whose name field matches the given node_name or None.
+  """
+  for node_def in graph_def.node:
+    if node_def.name == node_name:
+      return node_def
+  return None

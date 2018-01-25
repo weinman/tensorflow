@@ -11,6 +11,7 @@ load(
     "//tensorflow:tensorflow.bzl",
     "tf_cc_test",
     "tf_copts",
+    "if_windows",
 )
 
 filegroup(
@@ -101,7 +102,7 @@ cc_library(
         ":http_request",
         "//tensorflow/core:framework_headers_lib",
         "//tensorflow/core:lib_internal",
-        "@curl//:curl",
+        "@curl",
     ],
 )
 
@@ -118,7 +119,7 @@ cc_library(
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
         "//tensorflow/core:test",
-        "@curl//:curl",
+        "@curl",
     ],
 )
 
@@ -261,6 +262,7 @@ tf_cc_test(
     name = "gcs_dns_cache_test",
     size = "small",
     srcs = ["gcs_dns_cache_test.cc"],
+    linkopts = if_windows(["-DEFAULTLIB:ws2_32.lib"]),
     deps = [
         ":gcs_dns_cache",
         "//tensorflow/core:lib",

@@ -36,6 +36,7 @@ from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.util import compat
 from tensorflow.python.util.deprecation import deprecated_args
+from tensorflow.python.util.tf_export import tf_export
 
 
 # TODO(josh11b): SWIG the code from node_def_util instead of duplicating
@@ -278,8 +279,6 @@ def _PopulateTFImportGraphDefOptions(options, prefix, input_map,
       c_api.TF_ImportGraphDefOptionsAddReturnOperation(options,
                                                        compat.as_str(name))
 
-  # TODO(skyewm): control dependencies
-
 
 def _ProcessNewOps(graph):
   """Processes the newly-added TF_Operations in `graph`."""
@@ -287,11 +286,7 @@ def _ProcessNewOps(graph):
   # is specified in the attributes.
   colocation_pairs = {}
 
-  for c_op in c_api_util.new_tf_operations(graph):
-    # pylint: disable=protected-access
-    new_op = graph._create_op_from_tf_operation(c_op, compute_device=False)
-    # pylint: enable=protected-access
-
+  for new_op in graph._add_new_tf_operations(compute_devices=False):  # pylint: disable=protected-access
     colocation_names = _GetColocationNames(new_op)
     if colocation_names:
       colocation_pairs[new_op] = colocation_names
@@ -375,6 +370,7 @@ def _GatherReturnElements(requested_return_elements, graph, results):
   return combined_return_elements
 
 
+@tf_export('import_graph_def')
 @deprecated_args(None, 'Please file an issue at '
                  'https://github.com/tensorflow/tensorflow/issues if you depend'
                  ' on this feature.',
@@ -648,13 +644,13 @@ def import_graph_def(graph_def, input_map=None, return_elements=None,
                   node, 'Input tensor %r %s' % (input_name, te)))
 
         # pylint: disable=protected-access
-        if op._input_dtypes != input_types:
+        if op._input_types != input_types:
           raise ValueError(
               _InvalidNodeMessage(
                   node,
                   'Input types mismatch (expected %r but got %r)'
                   % (', '.join(dtypes.as_dtype(x).name for x in input_types),
-                     ', '.join(x.name for x in op._input_dtypes))))
+                     ', '.join(x.name for x in op._input_types))))
         # pylint: enable=protected-access
 
         if not g._is_function(op.type):  # pylint: disable=protected-access

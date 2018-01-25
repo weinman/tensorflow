@@ -257,8 +257,10 @@ void XlaLocalLaunchOp::Compute(OpKernelContext* ctx) {
 
   const XlaCompiler::CompilationResult* kernel;
   xla::LocalExecutable* executable;
+
   OP_REQUIRES_OK(ctx, cache->Compile(options, function_, num_constant_args_,
-                                     variables, ctx, &kernel, &executable));
+                                     variables, ctx, &kernel, &executable,
+                                     /*compile_options=*/nullptr));
 
   VLOG(1) << "Executing XLA Computation...";
 
@@ -287,10 +289,17 @@ void XlaLocalLaunchOp::Compute(OpKernelContext* ctx) {
     gpu::DeviceMemoryBase dmem = gpu::DeviceMemoryBase(
         const_cast<char*>(t->tensor_data().data()), t->tensor_data().size());
 
-    arg_buffers[i] =
-        xla::ShapedBuffer::MakeArrayShapedBuffer(
-            shape, client->platform(), client->default_device_ordinal(), dmem)
-            .ConsumeValueOrDie();
+    const xla::Shape on_device_shape =
+        client->backend().transfer_manager()->HostShapeToDeviceShape(shape);
+    CHECK(xla::ShapeUtil::Equal(shape, on_device_shape))
+        << "On-device shape "
+        << xla::ShapeUtil::HumanStringWithLayout(on_device_shape)
+        << " not the same as on-host shape "
+        << xla::ShapeUtil::HumanStringWithLayout(shape);
+    arg_buffers[i] = xla::MakeUnique<xla::ShapedBuffer>(
+        /*on_host_shape=*/shape, /*on_device_shape=*/shape, client->platform(),
+        client->default_device_ordinal());
+    arg_buffers[i]->set_buffer(dmem, /*index=*/{});
     arg_ptrs[i] = arg_buffers[i].get();
 
     OP_REQUIRES_OK(ctx, xla_allocator.RegisterArgument(t));
@@ -313,7 +322,7 @@ void XlaLocalLaunchOp::Compute(OpKernelContext* ctx) {
 
   // Computation output should always be a tuple.
   if (VLOG_IS_ON(2)) {
-    VLOG(2) << "Result tuple shape: " << output->shape().DebugString();
+    VLOG(2) << "Result tuple shape: " << output->on_host_shape().DebugString();
   }
   CHECK_EQ(ctx->num_outputs(), kernel->outputs.size());
 
