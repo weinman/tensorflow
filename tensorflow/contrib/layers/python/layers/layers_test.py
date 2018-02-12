@@ -1308,11 +1308,12 @@ class DenseToSparseTest(test.TestCase):
     expected_constant = np.reshape(np.arange(24, dtype=np.int64), (3, 4, 2))
     tensor = constant_op.constant(expected_constant)
     sparse = _layers.dense_to_sparse(tensor)
-    dense = sparse_ops.sparse_to_dense(
-        sparse.indices, sparse.dense_shape, sparse.values)
+    dense = sparse_ops.sparse_to_dense(sparse.indices, sparse.dense_shape,
+                                       sparse.values)
     with self.test_session() as sess:
       constant = sess.run(dense)
       self.assertAllEqual(expected_constant, constant)
+
 
 class DropoutTest(test.TestCase):
 
@@ -2949,6 +2950,28 @@ class GDNTest(test.TestCase):
     self.assertAllClose(y, x * np.sqrt(1 + .1 * (x**2)), rtol=0, atol=1e-6)
 
 
+class ImagesToSequenceTest(test.TestCase):
+
+  def testInvalidDataFormat(self):
+    height, width = 7, 11
+    images = np.random.uniform(size=(5, height, width, 2))
+    with self.assertRaisesRegexp(ValueError,
+                                 'data_format has to be either NCHW or NHWC.'):
+      _layers.images_to_sequence(images, data_format='CHWN')
+
+  def testImagesToSequenceDims(self):
+    height, width = 7, 11
+    images = np.random.uniform(size=(2, height, width, 5)).astype(np.float32)
+    output = _layers.images_to_sequence(images)
+    self.assertListEqual(output.get_shape().as_list(), [11, 14, 5])
+
+  def testImagesToSequenceNCHW(self):
+    height, width = 7, 11
+    images = np.random.uniform(size=(2, 5, height, width)).astype(np.float32)
+    output = _layers.images_to_sequence(images, data_format='NCHW')
+    self.assertListEqual(output.get_shape().as_list(), [11, 14, 5])
+
+
 class MaxPool2DTest(test.TestCase):
 
   def testInvalidDataFormat(self):
@@ -3415,6 +3438,33 @@ class ScaleGradientTests(test.TestCase):
       np.testing.assert_array_equal(x.eval(), y.eval())
       g_x, = gradients_impl.gradients(y, [x], [np.array([3], np.float32)])
       np.testing.assert_array_equal([3 * 2], g_x.eval())
+
+
+class SequenceToImagesTest(test.TestCase):
+
+  def testImagesToSequenceDims(self):
+    num_batches = 14
+    num_time_steps = 11
+    num_channels = 5
+    desired_height = 7
+    sequence = np.random.uniform(size=(num_time_steps,
+                                       num_batches,
+                                       num_channels)).astype(np.float32)
+    output = _layers.sequence_to_images(sequence, desired_height)
+    self.assertListEqual(output.get_shape().as_list(), [2, 7, 11, 5])
+
+  def testImagesToSequenceNCHW(self):
+    num_batches = 14
+    num_time_steps = 11
+    num_channels = 5
+    desired_height = 7
+    sequence = np.random.uniform(size=(num_time_steps,
+                                       num_batches,
+                                       num_channels)).astype(np.float32)
+    output = _layers.sequence_to_images(sequence,
+                                        desired_height,
+                                        output_data_format='channels_first')
+    self.assertListEqual(output.get_shape().as_list(), [2, 5, 7, 11])
 
 
 class SoftmaxTests(test.TestCase):
