@@ -18,6 +18,8 @@ filegroup(
         "ctc_beam_search.h",
         "ctc_decoder.h",
         "ctc_loss_util.h",
+        "ctc_trie_node.h",
+        "ctc_vocabulary.h",
     ],
 )
 
@@ -66,6 +68,17 @@ cc_library(
         "//tensorflow/core:lib_internal",
         "//third_party/eigen3",
     ],
+)
+
+cc_binary(
+    name = "ctc_generate_trie",
+    srcs = [
+        "ctc_generate_trie.cc",
+        "ctc_trie_node.h",
+        "ctc_vocabulary.h",
+    ],
+    copts = ['-fexceptions', '-std=c++11'],
+    linkopts = ['-lm'],
 )
 
 tf_cc_tests(
