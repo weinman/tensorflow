@@ -637,6 +637,20 @@ class StridedSlice
   }
 };
 
+class TopK_V2 : public BuiltinOperator<TopKV2Operator, ::tflite::TopKV2Options,
+                                       ::tflite::BuiltinOptions_TopKV2Options> {
+ public:
+  using BuiltinOperator::BuiltinOperator;
+  flatbuffers::Offset<TfLiteOptions> WriteOptions(
+      const TocoOperator& op,
+      flatbuffers::FlatBufferBuilder* builder) const override {
+    return ::tflite::CreateTopKV2Options(*builder);
+  }
+
+  void ReadOptions(const TfLiteOptions& options,
+                   TocoOperator* op) const override {}
+};
+
 class TensorFlowUnsupported : public BaseOperator {
  public:
   using BaseOperator::BaseOperator;
@@ -802,6 +816,8 @@ std::vector<std::unique_ptr<BaseOperator>> BuildOperatorList() {
   ops.emplace_back(new StridedSlice(::tflite::BuiltinOperator_STRIDED_SLICE,
                                     OperatorType::kStridedSlice));
   ops.emplace_back(
+      new TopK_V2(::tflite::BuiltinOperator_TOPK_V2, OperatorType::kTopK_V2));
+  ops.emplace_back(
       new Lstm(::tflite::BuiltinOperator_LSTM, OperatorType::kLstmCell));
 
   // Custom Operators.
@@ -835,6 +851,7 @@ std::vector<std::unique_ptr<BaseOperator>> BuildOperatorList() {
       "LOGISTIC", OperatorType::kLogistic));
   ops.emplace_back(
       new SimpleOperator<TanhOperator>("TANH", OperatorType::kTanh));
+  ops.emplace_back(new SimpleOperator<ExpOperator>("EXP", OperatorType::kExp));
 
   return ops;
 }
