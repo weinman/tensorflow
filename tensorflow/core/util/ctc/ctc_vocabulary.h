@@ -48,7 +48,7 @@ class Vocabulary {
     std::vector<int*> GetVocabList() {
       return vocabulary;
     }
-
+    
   private:
     int vocab_size;
     std::vector<int*> vocabulary;

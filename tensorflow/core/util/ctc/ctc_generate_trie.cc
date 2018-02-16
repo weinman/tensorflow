@@ -15,6 +15,8 @@ limitations under the License.
 
 /* Code adapted from https://github.com/timediv/tensorflow-with-kenlm */
 
+#include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 #include "ctc_trie_node.h"
@@ -23,14 +25,17 @@ limitations under the License.
 using namespace tensorflow::ctc;
 
 int main(int argc, char *argv[]) {
-  if (argc != 2) {
+  if (argc != 3) {
     std::cerr << "Usage " << argv[0]
               << " <vocabulary_path>"
+              << " <trie_out_path>"      
               << std::endl;
     return 1;
   }
   
   const char *vocabulary_path = argv[1];
+  const char *trie_out_path = argv[2];
+  
   Vocabulary vocabulary(vocabulary_path);
   std::vector<int*> vocab_list = vocabulary.GetVocabList();
   
@@ -41,4 +46,9 @@ int main(int argc, char *argv[]) {
   for (int* word : vocab_list) {
     root.Insert(word);
   }
+
+  std::ofstream out;
+  out.open(trie_out_path);
+  root.WriteToStream(out);
+  return 0;
 }

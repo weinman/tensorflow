@@ -53,12 +53,20 @@ class TrieNode {
       return label;
     }
 
+    void WriteToStream(std::ofstream& out) {
+      out << label << std::endl;
+      // recursive call
+      for (TrieNode* c : children) {
+        c->WriteToStream(out);
+      }
+    }
+    
   private:
     int label;
     int prefixCount;
     std::vector<int> childLabels;
     std::vector<TrieNode*> children;
-  };
+};
 } // namespace ctc
 } // namespace tensorflow
 
