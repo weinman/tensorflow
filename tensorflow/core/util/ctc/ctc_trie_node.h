@@ -41,10 +41,17 @@ class TrieNode {
     void Insert(const int *word) {
       prefixCount++;
       int wordChar = *word;
-      if (wordChar != 26) {
-        TrieNode *child = children[wordChar];
-        if (child == nullptr)
-          child = children[wordChar] = new TrieNode(wordChar);
+      if (wordChar <= 26 && wordChar >=0 ) {
+        // search for child node in word vector
+        TrieNode *child;
+        int ind = ChildLabelSearch(wordChar);
+        if (ind < 0) {
+          childLabels.push_back(wordChar);
+          child = new TrieNode(wordChar);
+          children.push_back(child);
+        } else {
+          child = children.at(ind);
+        }
         child->Insert(word + 1);
       }
     }
@@ -66,7 +73,19 @@ class TrieNode {
     int prefixCount;
     std::vector<int> childLabels;
     std::vector<TrieNode*> children;
-};
+
+    // TODO: sort insertion into child vector
+    int ChildLabelSearch(int label) {
+      int i=0;
+      for (int l : childLabels) {
+        if (l == label) {
+          return i;
+        }
+        ++i;
+      }
+      return -1;
+    }
+}; // TrieNode
 } // namespace ctc
 } // namespace tensorflow
 

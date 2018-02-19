@@ -39,7 +39,6 @@ int main(int argc, char *argv[]) {
   Vocabulary vocabulary(vocabulary_path);
   std::vector<int*> vocab_list = vocabulary.GetVocabList();
   
-
   // root of trie node has index -1
   // TODO: figure out more appropriate value
   TrieNode root(-1);
