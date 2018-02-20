@@ -29,7 +29,9 @@ namespace ctc {
 class TrieNode {
   public:
     TrieNode(int label) : label(label),
-      prefixCount(0) {}
+      prefixCount(0) {
+      // std::cout << "New node:  " << label << std::endl;
+    }
 
     ~TrieNode() {
       childLabels.clear();
@@ -38,21 +40,23 @@ class TrieNode {
 
     // we're building the trie from a SparseTensorValue
     // each insertion is a dense vector of int labels
-    void Insert(const int *word) {
+    void Insert(std::vector<int> word) {
+      if (word.empty()) return;
       prefixCount++;
-      int wordChar = *word;
+      int wordChar = word.at(0);
       if (wordChar <= 26 && wordChar >=0 ) {
         // search for child node in word vector
         TrieNode *child;
         int ind = ChildLabelSearch(wordChar);
         if (ind < 0) {
-          childLabels.push_back(wordChar);
           child = new TrieNode(wordChar);
+          childLabels.push_back(wordChar);
           children.push_back(child);
         } else {
           child = children.at(ind);
         }
-        child->Insert(word + 1);
+        word.erase(word.begin());
+        child->Insert(word);
       }
     }
 
@@ -61,7 +65,7 @@ class TrieNode {
     }
 
     void WriteToStream(std::ofstream& out) {
-      out << label << std::endl;
+      out << GetLabel() << std::endl;
       // recursive call
       for (TrieNode* c : children) {
         c->WriteToStream(out);

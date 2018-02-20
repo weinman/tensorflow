@@ -31,7 +31,6 @@ namespace ctc {
 class Vocabulary {
   public:
     Vocabulary(const char *vocab_path) {
-      // TODO: parse strings in path file to build up dictionary
       std::ifstream in(vocab_path, std::ios::in);
       ReadFromFile(in);
       in.close();
@@ -45,21 +44,32 @@ class Vocabulary {
       return vocab_size;
     }
 
-    std::vector<int*> GetVocabList() {
+    std::vector<std::vector<int>> GetVocabList() {
       return vocabulary;
     }
     
+    void PrintVocab() {
+      for (std::vector<int> word : vocabulary) {
+        for (int wChar : word) {
+          if (wChar >= 0 && wChar <= 26) {
+            std::cout << wChar << " "; 
+          }
+        }
+      }
+    }
+
   private:
     int vocab_size;
-    std::vector<int*> vocabulary;
+    std::vector<std::vector<int>> vocabulary;
 
     void ReadFromFile(std::ifstream& in) {
       vocab_size = 0;
       std::string str;      
       while (std::getline(in, str)) {
-        int ret[str.length()];
+        // std::cout << "Word:  " << str << std::endl;
+        std::vector<int> ret;
         for (int i=0; i<str.length(); ++i) {
-          ret[i] = ((int) str.at(i)) - ((int) 'a');
+          ret.push_back(str.at(i) - 'a');
         }
         vocabulary.push_back(ret);
         vocab_size++;        

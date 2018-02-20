@@ -37,17 +37,18 @@ int main(int argc, char *argv[]) {
   const char *trie_out_path = argv[2];
   
   Vocabulary vocabulary(vocabulary_path);
-  std::vector<int*> vocab_list = vocabulary.GetVocabList();
-  
+  std::vector<std::vector<int>> vocab_list = vocabulary.GetVocabList();
+
   // root of trie node has index -1
   // TODO: figure out more appropriate value
   TrieNode root(-1);
-  for (int* word : vocab_list) {
+  for (std::vector<int> word : vocab_list) {
     root.Insert(word);
   }
 
   std::ofstream out;
   out.open(trie_out_path);
   root.WriteToStream(out);
+  out.close();
   return 0;
 }
