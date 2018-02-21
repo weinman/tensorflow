@@ -50,5 +50,6 @@ int main(int argc, char *argv[]) {
   out.open(trie_out_path);
   root.WriteToStream(out);
   out.close();
+
   return 0;
 }

@@ -65,13 +65,30 @@ class TrieNode {
     }
 
     void WriteToStream(std::ofstream& out) {
-      out << GetLabel() << std::endl;
+      out << label << " " << prefixCount << std::endl;
       // recursive call
       for (TrieNode* c : children) {
         c->WriteToStream(out);
       }
     }
-    
+
+    static void ReadFromStream(std::ifstream& in, TrieNode* &obj) {
+      int label, prefix_count;
+      in >> label >> prefix_count;
+
+      obj = new TrieNode(label);
+      obj->ReadNode(in);
+
+      std::vector<int> cLabs;
+      std::vector<TrieNode*> childs;
+      for (int i = 0; i < prefix_count; ++i) {
+        TrieNode* c;
+        ReadFromStream(in, c);
+        obj->childLabels.push_back(c->label);
+        obj->children.push_back(c);
+      }
+    }
+
   private:
     int label;
     int prefixCount;
@@ -89,6 +106,12 @@ class TrieNode {
       }
       return -1;
     }
+
+    void ReadNode(std::ifstream& in) {
+      in >> label;
+      in >> prefixCount;
+    }
+
 }; // TrieNode
 } // namespace ctc
 } // namespace tensorflow

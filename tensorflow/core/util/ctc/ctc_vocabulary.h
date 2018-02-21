@@ -66,7 +66,6 @@ class Vocabulary {
       vocab_size = 0;
       std::string str;      
       while (std::getline(in, str)) {
-        // std::cout << "Word:  " << str << std::endl;
         std::vector<int> ret;
         for (int i=0; i<str.length(); ++i) {
           ret.push_back(str.at(i) - 'a');
