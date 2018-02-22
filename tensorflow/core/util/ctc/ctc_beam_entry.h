@@ -40,6 +40,10 @@ namespace ctc_beam_search {
 
 struct EmptyBeamState {};
 
+struct TrieBeamState {
+  TrieNode *incomplete_word_trie_node;
+};
+
 struct BeamProbability {
   BeamProbability() : total(kLogZero), blank(kLogZero), label(kLogZero) {}
   void Reset() {
