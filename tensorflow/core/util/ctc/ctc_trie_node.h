@@ -24,7 +24,7 @@ limitations under the License.
 #include <iostream>
 
 // #include "third_party/eigen3/Eigen/Core"
-// #include "tensorflow/core/lib/gtl/flatmap.h"
+#include "tensorflow/core/lib/gtl/flatmap.h"
 #include "tensorflow/core/util/ctc/ctc_vocabulary.h"
 
 namespace tensorflow {
@@ -69,6 +69,12 @@ class TrieNode {
       return label;
     }
 
+    std::vector<int> GetTrieLabels() {
+      std::vector<int> labs;
+      __GetTrieLabels(labs);
+      return labs;
+    }
+
     void WriteToStream(std::ofstream& out) {
       out << label << " " << prefixCount << std::endl;
       // recursive call
@@ -110,6 +116,13 @@ class TrieNode {
 
     void ReadNode(std::ifstream& in) {
       in >> label >> prefixCount;
+    }
+
+    void __GetTrieLabels(std::vector<int> labs) {
+      labs.push_back(label);
+      for (TrieNode *c : children) {
+        c->__GetTrieLabels(labs);
+      }
     }
 
 }; // TrieNode

@@ -33,7 +33,16 @@ TrieNode *createTrieNode() {
   ifstream in;
   in.open(vocabulary_path);
   ReadFromStream(in, node);
+  in.close();
   return node;
 }
 
+TEST(TrieNode, Vocabulary) {
+  TrieNode *node = createTrieNode();
+  std::vector<int> node_labs = node->GetTrieLabels();
+  for (int i=0; i < node_labs.size(); ++i) {
+    EXPECT_EQ(node_labs.at(i), test_labels[i]);
+  }
+}
+  
 } // namespace

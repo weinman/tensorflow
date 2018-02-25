@@ -77,6 +77,10 @@ cc_binary(
         "ctc_trie_node.h",
         "ctc_vocabulary.h",
     ],
+    deps = [
+        "//tensorflow/core:lib",
+        "//tensorflow/core:lib_internal",
+    ],
     copts = ['-fexceptions', '-std=c++11'],
     linkopts = ['-lm'],
 )
@@ -92,6 +96,18 @@ tf_cc_tests(
         "//tensorflow/core:lib",
         "//tensorflow/core:test",
         "//tensorflow/core:test_main",
+    ],
+)
+
+tf_cc_tests(
+    name = "ctc_trie_node_test",
+    size = "small",
+    srcs = [
+        "ctc_trie_node_test.cc",
+        "ctc_trie_node.h"
+    ],
+    deps = [
+
     ],
 )
 
