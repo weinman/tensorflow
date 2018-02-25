@@ -36,9 +36,6 @@ int main(int argc, char *argv[]) {
   const char *vocabulary_path = argv[1];
   const char *trie_out_path = argv[2];
 
-  std::ifstream in;
-  in.open(trie_out_path);
-
   Vocabulary vocabulary(vocabulary_path);
   std::vector<std::vector<int>> vocab_list = vocabulary.GetVocabList();
 
@@ -48,11 +45,11 @@ int main(int argc, char *argv[]) {
   for (std::vector<int> word : vocab_list) {
     root.Insert(word);
   }
-
+  
   std::ofstream out;
   out.open(trie_out_path);
   root.WriteToStream(out);
   out.close();
-
+  
   return 0;
 }

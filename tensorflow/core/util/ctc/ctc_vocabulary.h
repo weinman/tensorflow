@@ -39,7 +39,7 @@ class Vocabulary {
     ~Vocabulary() {
       vocabulary.clear();
     }
-
+    
     int GetVocabSize() {
       return vocab_size;
     }

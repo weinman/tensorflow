@@ -19,19 +19,24 @@ limitations under the License.
 #define TENSORFLOW_CORE_UTIL_CTC_CTC_TRIE_NODE_H_
 
 #include <algorithm>
-#include <iostream>
+#include <memory>
 #include <vector>
-#include "ctc_vocabulary.h"
+#include <iostream>
+
+// #include "third_party/eigen3/Eigen/Core"
+// #include "tensorflow/core/lib/gtl/flatmap.h"
+#include "tensorflow/core/util/ctc/ctc_vocabulary.h"
 
 namespace tensorflow {
 namespace ctc {
   
 class TrieNode {
   public:
+    TrieNode() : label(-1),
+      prefixCount(0) { }
+  
     TrieNode(int label) : label(label),
-      prefixCount(0) {
-      // std::cout << "New node:  " << label << std::endl;
-    }
+      prefixCount(0) { }
 
     ~TrieNode() {
       childLabels.clear();
@@ -73,16 +78,12 @@ class TrieNode {
     }
 
     static void ReadFromStream(std::ifstream& in, TrieNode* &obj) {
-      int label, prefix_count;
-      in >> label >> prefix_count;
-
-      obj = new TrieNode(label);
       obj->ReadNode(in);
 
       std::vector<int> cLabs;
       std::vector<TrieNode*> childs;
-      for (int i = 0; i < prefix_count; ++i) {
-        TrieNode* c;
+      for (int i = 0; i < obj->prefixCount; ++i) {
+        TrieNode *c = new TrieNode();
         ReadFromStream(in, c);
         obj->childLabels.push_back(c->label);
         obj->children.push_back(c);
@@ -108,8 +109,7 @@ class TrieNode {
     }
 
     void ReadNode(std::ifstream& in) {
-      in >> label;
-      in >> prefixCount;
+      in >> label >> prefixCount;
     }
 
 }; // TrieNode
