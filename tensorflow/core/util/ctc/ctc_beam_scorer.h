@@ -25,6 +25,7 @@ limitations under the License.
 #define TENSORFLOW_CORE_UTIL_CTC_CTC_BEAM_SCORER_H_
 
 #include "tensorflow/core/util/ctc/ctc_beam_entry.h"
+#include "tensorflow/core/util/ctc/ctc_vocabulary.h"
 
 namespace tensorflow {
 namespace ctc {
@@ -67,7 +68,63 @@ class BaseBeamScorer {
   virtual float GetStateEndExpansionScore(const CTCBeamState& state) const {
     return 0;
   }
-};
+}; // BaseBeamScorer
+
+class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
+ public:
+  virtual ~TrieBeamScorer() {
+    delete vocabulary;
+    delete trieRoot;
+  }
+  TrieBeamScorer(const char *dictionary_path) {
+    vocabulary = new Vocabulary(dictionary_path);
+    std::vector<std::vector<int>> vocab_list = vocabulary.GetVocabList();
+
+    TrieNode root(-1);
+    for (std::vector<int> word : vocab_list) {
+      root.Insert(word);
+    }
+  }
+
+  // State initialization
+  void InitializeState(TrieBeamState* root) const {
+    root->incomplete_word_trie_node = trieRoot;
+  }
+  // ExpandState is called when expanding a beam to one of its children.
+  // Called at most once per child beam. In the simplest case, no state
+  // expansion is done.
+  virtual void ExpandState(const TrieBeamState& from_state, int from_label,
+                           TrieBeamState* to_state, int to_label) const {
+    
+  }
+  // ExpandStateEnd is called after decoding has finished. Its purpose is to
+  // allow a final scoring of the beam in its current state, before resorting
+  // and retrieving the TopN requested candidates. Called at most once per beam.
+  virtual void ExpandStateEnd(CTCBeamState* state) const {}
+  // GetStateExpansionScore should be an inexpensive method to retrieve the
+  // (cached) expansion score computed within ExpandState. The score is
+  // multiplied (log-addition) with the input score at the current step from
+  // the network.
+  //
+  // The score returned should be a log-probability. In the simplest case, as
+  // there's no state expansion logic, the expansion score is zero.
+  virtual float GetStateExpansionScore(const CTCBeamState& state,
+                                       float previous_score) const {
+    return previous_score;
+  }
+  // GetStateEndExpansionScore should be an inexpensive method to retrieve the
+  // (cached) expansion score computed within ExpandStateEnd. The score is
+  // multiplied (log-addition) with the final probability of the beam.
+  //
+  // The score returned should be a log-probability.
+  virtual float GetStateEndExpansionScore(const CTCBeamState& state) const {
+    return 0;
+  }  
+
+ private:
+  Vocabulary *vocabulary;
+  TrieNode *trieRoot;
+}
 
 }  // namespace ctc
 }  // namespace tensorflow

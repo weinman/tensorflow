@@ -26,6 +26,7 @@ limitations under the License.
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
 #include "tensorflow/core/util/ctc/ctc_loss_util.h"
+#include "tensorflow/core/util/ctc/ctc_trie_node.h"
 
 namespace tensorflow {
 namespace ctc {
