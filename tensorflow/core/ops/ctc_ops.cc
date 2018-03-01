@@ -130,8 +130,6 @@ REGISTER_OP("CTCBeamSearchDecoder")
       return Status::OK();
     });
 
-}  // namespace tensorflow
-
 REGISTER_OP("CTCBeamSearchDecoderTrie")
     .Input("inputs: float")
     .Input("sequence_length: int32")

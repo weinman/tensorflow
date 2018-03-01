@@ -30,6 +30,8 @@ limitations under the License.
 namespace tensorflow {
 namespace ctc {
 
+using namespace ctc_beam_search;
+
 // Base implementation of a beam scorer used by default by the decoder that can
 // be subclassed and provided as an argument to CTCBeamSearchDecoder, if complex
 // scoring is required. Its main purpose is to provide a thin layer for
@@ -78,7 +80,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   }
   TrieBeamScorer(const char *dictionary_path) {
     vocabulary = new Vocabulary(dictionary_path);
-    std::vector<std::vector<int>> vocab_list = vocabulary.GetVocabList();
+    std::vector<std::vector<int>> vocab_list = vocabulary->GetVocabList();
 
     TrieNode root(-1);
     for (std::vector<int> word : vocab_list) {
@@ -93,14 +95,27 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // ExpandState is called when expanding a beam to one of its children.
   // Called at most once per child beam. In the simplest case, no state
   // expansion is done.
-  virtual void ExpandState(const TrieBeamState& from_state, int from_label,
+  void ExpandState(const TrieBeamState& from_state, int from_label,
                            TrieBeamState* to_state, int to_label) const {
-    
+    // In this case the prefix has a trie, indicating that it is a valid prefix within out dictionary
+    // Ensure that from state has a trie node
+    TrieNode *node;
+    if ((node = from_state.incomplete_word_trie_node) == nullptr) {
+      return;
+    }
+    // ensure that to state is a child of the from_state
+    if ((node = node->GetChildAt(to_label)) == nullptr) {
+      return;
+    }
+
+    CopyState(to_state, from_state);
+    to_state->incomplete_word += to_label;
+    to_state->incomplete_word_trie_node = node;
   }
   // ExpandStateEnd is called after decoding has finished. Its purpose is to
   // allow a final scoring of the beam in its current state, before resorting
   // and retrieving the TopN requested candidates. Called at most once per beam.
-  virtual void ExpandStateEnd(CTCBeamState* state) const {}
+  void ExpandStateEnd(TrieBeamState* state) const {}
   // GetStateExpansionScore should be an inexpensive method to retrieve the
   // (cached) expansion score computed within ExpandState. The score is
   // multiplied (log-addition) with the input score at the current step from
@@ -108,7 +123,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   //
   // The score returned should be a log-probability. In the simplest case, as
   // there's no state expansion logic, the expansion score is zero.
-  virtual float GetStateExpansionScore(const CTCBeamState& state,
+  float GetStateExpansionScore(const TrieBeamState& state,
                                        float previous_score) const {
     return previous_score;
   }
@@ -117,14 +132,19 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // multiplied (log-addition) with the final probability of the beam.
   //
   // The score returned should be a log-probability.
-  virtual float GetStateEndExpansionScore(const CTCBeamState& state) const {
+  float GetStateEndExpansionScore(const TrieBeamState& state) const {
     return 0;
   }  
 
  private:
   Vocabulary *vocabulary;
   TrieNode *trieRoot;
-}
+
+  void CopyState(TrieBeamState* to_state, const TrieBeamState& from_state) const {
+    to_state->incomplete_word_trie_node = from_state.incomplete_word_trie_node;
+    to_state->incomplete_word = from_state.incomplete_word;
+  }
+}; // TrieBeamState
 
 }  // namespace ctc
 }  // namespace tensorflow

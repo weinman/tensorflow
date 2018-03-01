@@ -334,8 +334,6 @@ class CTCBeamSearchDecoderOp : public OpKernel {
 REGISTER_KERNEL_BUILDER(Name("CTCBeamSearchDecoder").Device(DEVICE_CPU),
                         CTCBeamSearchDecoderOp);
 
-}  // end namespace tensorflow
-
 // CTC beam search trie
 class CTCBeamSearchDecoderTrieOp : public OpKernel {
  public:
@@ -356,8 +354,8 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
     OpOutputList decoded_values;
     OpOutputList decoded_shape;
     OP_REQUIRES_OK(ctx, decode_helper_.ValidateInputsGenerateOutputs(
-                            ctx, &inputs, &seq_len, &dictionary, &log_prob,
-                            &decoded_indices, &decoded_values, &decoded_shape));
+                            ctx, &inputs, &seq_len, &log_prob, &decoded_indices,
+                            &decoded_values, &decoded_shape), &dictionary);
 
     auto inputs_t = inputs->tensor<float, 3>();
     auto seq_len_t = seq_len->vec<int32>();

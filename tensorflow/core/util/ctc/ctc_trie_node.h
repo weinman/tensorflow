@@ -24,7 +24,7 @@ limitations under the License.
 #include <iostream>
 
 // #include "third_party/eigen3/Eigen/Core"
-#include "tensorflow/core/lib/gtl/flatmap.h"
+// #include "tensorflow/core/lib/gtl/flatmap.h"
 #include "tensorflow/core/util/ctc/ctc_vocabulary.h"
 
 namespace tensorflow {
@@ -68,6 +68,15 @@ class TrieNode {
     int GetLabel() {
       return label;
     }
+    
+    TrieNode* GetChildAt(int label) {
+      for (int i=0; i<childLabels.size(); ++i) {
+        if (childLabels.at(i) == label) {
+          return children.at(i);
+        }
+      }
+      return nullptr;
+    }
 
     std::vector<int> GetTrieLabels() {
       std::vector<int> labs;
@@ -99,6 +108,7 @@ class TrieNode {
   private:
     int label;
     int prefixCount;
+    // gtl::FlatMap<int, TrieNode*> children;
     std::vector<int> childLabels;
     std::vector<TrieNode*> children;
 
