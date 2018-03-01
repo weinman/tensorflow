@@ -134,7 +134,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // The score returned should be a log-probability.
   float GetStateEndExpansionScore(const TrieBeamState& state) const {
     return 0;
-  }  
+  }
 
  private:
   Vocabulary *vocabulary;

@@ -19,20 +19,20 @@ namespace {
 using tensorflow::ctc::TrieNode;
 using tensorflow::ctc::Vocabulary;
 
-const char test_sentence[] = "the quick brown fox jumps over the lazy dog";
+// const char test_sentence[] = "the quick brown fox jumps over the lazy dog";
 const char test_labels_count = 34;
 const char test_labels[] = {19, 7, 4, 16, 20, 8, 2, 10, 1, 17, 14, 22, 13, 5, 14,
                             23, 9, 20, 12, 15, 4, 3, 14, 21, 4, 17, 0, 11, 0, 25, 24,
                             3, 14, 6};
 
-const char *test_directory_path = "./tensorflow/core/util/ctc/testdata"
-const char *vocabulary_path = "./tensorflow/core/util/ctc/testdata/vocab"
+// const char *test_directory_path = "./tensorflow/core/util/ctc/testdata";
+const char *vocabulary_path = "./tensorflow/core/util/ctc/testdata/vocab";
 
 TrieNode *createTrieNode() {
   TrieNode *node;
-  ifstream in;
+  std::ifstream in;
   in.open(vocabulary_path);
-  ReadFromStream(in, node);
+  TrieNode::ReadFromStream(in, node);
   in.close();
   return node;
 }
@@ -40,9 +40,9 @@ TrieNode *createTrieNode() {
 TEST(TrieNode, Vocabulary) {
   TrieNode *node = createTrieNode();
   std::vector<int> node_labs = node->GetTrieLabels();
-  for (int i=0; i < node_labs.size(); ++i) {
+  for (int i=0; i < test_labels_count; ++i) {
     EXPECT_EQ(node_labs.at(i), test_labels[i]);
   }
 }
-  
+
 } // namespace

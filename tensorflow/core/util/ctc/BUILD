@@ -55,12 +55,16 @@ cc_library(
         "ctc_beam_scorer.h",
         "ctc_beam_search.h",
         "ctc_decoder.h",
+        "ctc_trie_node.h",
+        "ctc_vocabulary.h",
     ],
     hdrs = [
         "ctc_beam_entry.h",
         "ctc_beam_scorer.h",
         "ctc_beam_search.h",
         "ctc_decoder.h",
+        "ctc_trie_node.h",
+        "ctc_vocabulary.h",
     ],
     deps = [
         ":ctc_loss_util_lib",
@@ -107,7 +111,10 @@ tf_cc_tests(
         "ctc_trie_node.h"
     ],
     deps = [
-
+        ":ctc_beam_search_lib",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
     ],
 )
 
