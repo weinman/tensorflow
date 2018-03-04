@@ -24,115 +24,105 @@ limitations under the License.
 #include <iostream>
 
 // #include "third_party/eigen3/Eigen/Core"
-// #include "tensorflow/core/lib/gtl/flatmap.h"
+#include "tensorflow/core/lib/gtl/flatmap.h"
 #include "tensorflow/core/util/ctc/ctc_vocabulary.h"
 
 namespace tensorflow {
 namespace ctc {
-  
+
 class TrieNode {
   public:
     TrieNode() : label(-1),
-      prefixCount(0) { }
-  
+      prefixCount(0) {
+        children = TrieMap(26);
+    }
+
     TrieNode(int label) : label(label),
       prefixCount(0) { }
 
     ~TrieNode() {
-      childLabels.clear();
       children.clear();
     }
 
     // we're building the trie from a SparseTensorValue
     // each insertion is a dense vector of int labels
-    void Insert(std::vector<int> word) {
+    void Insert(std::vector<char> word) {
       if (word.empty()) return;
       prefixCount++;
       int wordChar = word.at(0);
       if (wordChar <= 26 && wordChar >=0 ) {
         // search for child node in word vector
-        TrieNode *child;
-        int ind = ChildLabelSearch(wordChar);
-        if (ind < 0) {
-          child = new TrieNode(wordChar);
-          childLabels.push_back(wordChar);
-          children.push_back(child);
-        } else {
-          child = children.at(ind);
+        TrieNode *child = GetChildAt(wordChar);
+        if (child == nullptr) {
+          children.emplace(wordChar, child);
         }
         word.erase(word.begin());
         child->Insert(word);
       }
     }
 
-    int GetLabel() {
+    char GetLabel() {
       return label;
     }
-    
-    TrieNode* GetChildAt(int label) {
-      for (int i=0; i<childLabels.size(); ++i) {
-        if (childLabels.at(i) == label) {
-          return children.at(i);
-        }
+
+    TrieNode* GetChildAt(char label) {
+      auto iter = children.find(label);
+      if (iter == children.end()) {
+        return nullptr;
+      } else {
+        return iter->second;
       }
-      return nullptr;
     }
 
-    std::vector<int> GetTrieLabels() {
-      std::vector<int> labs;
-      __GetTrieLabels(labs);
+    std::vector<char> GetTrieLabels() {
+      std::vector<char> labs;
+      labs = __GetTrieLabels(labs);
       return labs;
+    }
+
+    std::vector<TrieNode*> GetChildren() {
+      std::vector<TrieNode*> nodes;
+      for (const auto& c : children) {
+        nodes.push_back(c.second);
+      }
+      return nodes;
     }
 
     void WriteToStream(std::ofstream& out) {
       out << label << " " << prefixCount << std::endl;
       // recursive call
-      for (TrieNode* c : children) {
-        c->WriteToStream(out);
+      for (const auto& c : children) {
+        c.second->WriteToStream(out);
       }
     }
 
     static void ReadFromStream(std::ifstream& in, TrieNode* &obj) {
       obj->ReadNode(in);
 
-      std::vector<int> cLabs;
-      std::vector<TrieNode*> childs;
       for (int i = 0; i < obj->prefixCount; ++i) {
         TrieNode *c = new TrieNode();
         ReadFromStream(in, c);
-        obj->childLabels.push_back(c->label);
-        obj->children.push_back(c);
+        obj->children.emplace(c->label, c);
       }
     }
 
   private:
-    int label;
-    int prefixCount;
-    // gtl::FlatMap<int, TrieNode*> children;
-    std::vector<int> childLabels;
-    std::vector<TrieNode*> children;
+    typedef gtl::FlatMap<char, TrieNode*> TrieMap;
 
-    // TODO: sort insertion into child vector
-    int ChildLabelSearch(int label) {
-      int i=0;
-      for (int l : childLabels) {
-        if (l == label) {
-          return i;
-        }
-        ++i;
-      }
-      return -1;
-    }
+    char label;
+    int prefixCount;
+    TrieMap children;
 
     void ReadNode(std::ifstream& in) {
       in >> label >> prefixCount;
     }
 
-    void __GetTrieLabels(std::vector<int> labs) {
+    std::vector<char> __GetTrieLabels(std::vector<char> labs) {
       labs.push_back(label);
-      for (TrieNode *c : children) {
-        c->__GetTrieLabels(labs);
+      for (const auto& c : children) {
+        labs = c.second->__GetTrieLabels(labs);
       }
+      return labs;
     }
 
 }; // TrieNode

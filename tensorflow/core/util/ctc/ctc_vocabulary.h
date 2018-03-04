@@ -31,7 +31,7 @@ namespace ctc {
 class Vocabulary {
   public:
     Vocabulary(const char *vocab_path) {
-      std::ifstream in(vocab_path, std::ios::in);
+      std::ifstream in(vocab_path);
       ReadFromFile(in);
       in.close();
     }
@@ -39,20 +39,20 @@ class Vocabulary {
     ~Vocabulary() {
       vocabulary.clear();
     }
-    
+
     int GetVocabSize() {
       return vocab_size;
     }
 
-    std::vector<std::vector<int>> GetVocabList() {
+    std::vector<std::vector<char>> GetVocabList() {
       return vocabulary;
     }
-    
+
     void PrintVocab() {
-      for (std::vector<int> word : vocabulary) {
+      for (std::vector<char> word : vocabulary) {
         for (int wChar : word) {
           if (wChar >= 0 && wChar <= 26) {
-            std::cout << wChar << " "; 
+            std::cout << wChar << " ";
           }
         }
       }
@@ -60,22 +60,22 @@ class Vocabulary {
 
   private:
     int vocab_size;
-    std::vector<std::vector<int>> vocabulary;
+    std::vector<std::vector<char>> vocabulary;
 
     void ReadFromFile(std::ifstream& in) {
       vocab_size = 0;
-      std::string str;      
+      std::string str;
       while (std::getline(in, str)) {
-        std::vector<int> ret;
+        std::vector<char> ret;
         for (int i=0; i<str.length(); ++i) {
           ret.push_back(str.at(i) - 'a');
         }
         vocabulary.push_back(ret);
-        vocab_size++;        
+        vocab_size++;
       }
     }
 };
- 
+
 } // namespace ctc
 } // namespace tensorflow
 

@@ -28,28 +28,28 @@ int main(int argc, char *argv[]) {
   if (argc != 3) {
     std::cerr << "Usage " << argv[0]
               << " <vocabulary_path>"
-              << " <trie_out_path>"      
+              << " <trie_out_path>"
               << std::endl;
     return 1;
   }
-  
+
   const char *vocabulary_path = argv[1];
   const char *trie_out_path = argv[2];
 
   Vocabulary vocabulary(vocabulary_path);
-  std::vector<std::vector<int>> vocab_list = vocabulary.GetVocabList();
+  std::vector<std::vector<char>> vocab_list = vocabulary.GetVocabList();
 
   // root of trie node has index -1
   // TODO: figure out more appropriate value
   TrieNode root(-1);
-  for (std::vector<int> word : vocab_list) {
+  for (std::vector<char> word : vocab_list) {
     root.Insert(word);
   }
-  
+
   std::ofstream out;
   out.open(trie_out_path);
   root.WriteToStream(out);
   out.close();
-  
+
   return 0;
 }
