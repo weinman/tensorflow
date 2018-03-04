@@ -26,8 +26,7 @@ const char test_labels[] = {-1, 19, 7, 4, 16, 20, 8, 2, 10, 1, 17, 14, 22, 13,
                             5, 14, 23, 9, 20, 12, 15, 4, 3, 14, 21, 4, 17, 0,
                             11, 0, 25, 24, 3, 14, 6};
 
-std::string test_directory_path ("./tensorflow/core/util/ctc/testdata/");
-std::string vocabulary_path = test_directory_path + "vocab";
+const char *vocabulary_path = "./tensorflow/core/util/ctc/testdata/vocab";
 
 void __createTrieNode(TrieNode *root, Vocabulary *vocab) {
   std::vector<std::vector<char>> vocab_list = vocab->GetVocabList();
@@ -45,12 +44,12 @@ void __printTrie(TrieNode *root) {
 }
 
 TEST(TrieNode, VocabularyFromFile) {
-  Vocabulary vocabulary(vocabulary_path.c_str());
+  Vocabulary vocabulary(vocabulary_path);
   EXPECT_EQ(9, vocabulary.GetVocabSize());
 }
 
 TEST(TrieNode, TrieConstructionTest) {
-  Vocabulary vocabulary(vocabulary_path.c_str());
+  Vocabulary vocabulary(vocabulary_path);
 
   TrieNode root(-1);
   __createTrieNode(&root, &vocabulary);
