@@ -80,10 +80,10 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   }
   TrieBeamScorer(const char *dictionary_path) {
     vocabulary = new Vocabulary(dictionary_path);
-    std::vector<std::vector<int>> vocab_list = vocabulary->GetVocabList();
+    std::vector<std::vector<char>> vocab_list = vocabulary->GetVocabList();
 
     TrieNode root(-1);
-    for (std::vector<int> word : vocab_list) {
+    for (std::vector<char> word : vocab_list) {
       root.Insert(word);
     }
   }

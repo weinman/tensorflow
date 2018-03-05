@@ -118,6 +118,20 @@ tf_cc_tests(
     ],
 )
 
+tf_cc_tests(
+    name = "ctc_trie_beam_search_test",
+    size = "small",
+    srcs = [
+        "ctc_trie_beam_search_test.cc",
+    ],
+    deps = [
+        ":ctc_beam_search_lib",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
+    ],
+)
+
 cc_library(
     name = "ctc_loss_calculator_lib",
     srcs = [
