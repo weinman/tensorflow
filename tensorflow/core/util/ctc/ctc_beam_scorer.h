@@ -78,33 +78,45 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     delete vocabulary;
     delete trieRoot;
   }
+  TrieBeamScorer(std::vector<std::vector<char>> vocab_list) {
+    vocabulary = new Vocabulary(vocab_list);
+
+    trieRoot = new TrieNode(26);
+    for (std::vector<char> word : vocab_list) {
+        trieRoot->Insert(word);
+    }
+  }
+
   TrieBeamScorer(const char *dictionary_path) {
     vocabulary = new Vocabulary(dictionary_path);
     std::vector<std::vector<char>> vocab_list = vocabulary->GetVocabList();
 
-    TrieNode root(-1);
+    trieRoot = new TrieNode(26);
     for (std::vector<char> word : vocab_list) {
-      root.Insert(word);
+      trieRoot->Insert(word);
     }
   }
 
   // State initialization
-  void InitializeState(TrieBeamState* root) const {
+  void InitializeState(TrieBeamState* root) const override {
     root->incomplete_word_trie_node = trieRoot;
   }
   // ExpandState is called when expanding a beam to one of its children.
   // Called at most once per child beam. In the simplest case, no state
   // expansion is done.
   void ExpandState(const TrieBeamState& from_state, int from_label,
-                           TrieBeamState* to_state, int to_label) const {
+                           TrieBeamState* to_state, int to_label)
+                           const override {
     // In this case the prefix has a trie, indicating that it is a valid prefix within out dictionary
     // Ensure that from state has a trie node
     TrieNode *node;
     if ((node = from_state.incomplete_word_trie_node) == nullptr) {
+      std::cout << "from state nullptr" << std::endl;
       return;
     }
     // ensure that to state is a child of the from_state
     if ((node = node->GetChildAt(to_label)) == nullptr) {
+      std::cout << "no to_label" << std::endl;
       return;
     }
 
@@ -115,7 +127,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // ExpandStateEnd is called after decoding has finished. Its purpose is to
   // allow a final scoring of the beam in its current state, before resorting
   // and retrieving the TopN requested candidates. Called at most once per beam.
-  void ExpandStateEnd(TrieBeamState* state) const {}
+  void ExpandStateEnd(TrieBeamState* state) const override {}
   // GetStateExpansionScore should be an inexpensive method to retrieve the
   // (cached) expansion score computed within ExpandState. The score is
   // multiplied (log-addition) with the input score at the current step from
@@ -124,7 +136,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // The score returned should be a log-probability. In the simplest case, as
   // there's no state expansion logic, the expansion score is zero.
   float GetStateExpansionScore(const TrieBeamState& state,
-                                       float previous_score) const {
+                                       float previous_score) const override {
     return previous_score;
   }
   // GetStateEndExpansionScore should be an inexpensive method to retrieve the
@@ -132,7 +144,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // multiplied (log-addition) with the final probability of the beam.
   //
   // The score returned should be a log-probability.
-  float GetStateEndExpansionScore(const TrieBeamState& state) const {
+  float GetStateEndExpansionScore(const TrieBeamState& state) const override {
     return 0;
   }
 
