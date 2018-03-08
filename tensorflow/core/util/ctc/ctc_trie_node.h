@@ -19,12 +19,11 @@ limitations under the License.
 #define TENSORFLOW_CORE_UTIL_CTC_CTC_TRIE_NODE_H_
 
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <vector>
 #include <iostream>
 
-// #include "third_party/eigen3/Eigen/Core"
-#include "tensorflow/core/lib/gtl/flatmap.h"
 #include "tensorflow/core/util/ctc/ctc_vocabulary.h"
 
 namespace tensorflow {
@@ -32,13 +31,23 @@ namespace ctc {
 
 class TrieNode {
   public:
-    TrieNode() : label(-1),
-      prefixCount(0) {
-        children = TrieMap(26);
-    }
+    TrieNode(int vocabSize) : label(-1),
+      prefixCount(0),
+      vocabSize(vocabSize) {
+        children.reserve(vocabSize);
+      }
 
-    TrieNode(int label) : label(label),
-      prefixCount(0) { }
+    TrieNode(int label, int vocabSize) : label(label),
+      prefixCount(0),
+      vocabSize(vocabSize) {
+        children.reserve(vocabSize);
+      }
+
+    TrieNode(int label, int prefixCount, int vocabSize) : label(label),
+      prefixCount(prefixCount),
+      vocabSize(vocabSize) {
+        children.reserve(vocabSize);
+      }
 
     ~TrieNode() {
       children.clear();
@@ -47,17 +56,22 @@ class TrieNode {
     // we're building the trie from a SparseTensorValue
     // each insertion is a dense vector of int labels
     void Insert(std::vector<char> word) {
-      if (word.empty()) return;
+      if (word.size() == 0) return;
       prefixCount++;
       int wordChar = word.at(0);
-      if (wordChar <= 26 && wordChar >=0 ) {
+      if (wordChar <= vocabSize && wordChar >=0 ) {
         // search for child node in word vector
-        TrieNode *child = GetChildAt(wordChar);
-        if (child == nullptr) {
-          children.emplace(wordChar, child);
+        TrieMap::iterator iter;
+        iter = children.find(wordChar);
+        TrieNode *child_node;
+        if (iter != children.end()) {
+          child_node = iter->second;
+        } else {
+          child_node = new TrieNode(wordChar, prefixCount);
+          children.emplace(wordChar, child_node);
         }
         word.erase(word.begin());
-        child->Insert(word);
+        child_node->Insert(word);
       }
     }
 
@@ -67,11 +81,9 @@ class TrieNode {
 
     TrieNode* GetChildAt(char label) {
       auto iter = children.find(label);
-      if (iter == children.end()) {
-        return nullptr;
-      } else {
+      if (iter != children.end())
         return iter->second;
-      }
+      return nullptr;
     }
 
     std::vector<char> GetTrieLabels() {
@@ -100,17 +112,18 @@ class TrieNode {
       obj->ReadNode(in);
 
       for (int i = 0; i < obj->prefixCount; ++i) {
-        TrieNode *c = new TrieNode();
+        TrieNode *c = new TrieNode(26);
         ReadFromStream(in, c);
-        obj->children.emplace(c->label, c);
+        obj->children.insert({c->label, c});
       }
     }
 
   private:
-    typedef gtl::FlatMap<char, TrieNode*> TrieMap;
+    typedef std::unordered_map<char, TrieNode*> TrieMap;
 
     char label;
     int prefixCount;
+    int vocabSize;
     TrieMap children;
 
     void ReadNode(std::ifstream& in) {
