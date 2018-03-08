@@ -1,3 +1,4 @@
+#!/bin/bash -x
 # Copyright 2017 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,22 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Support for low discrepancy Halton sequences.
 
-"""
+set -e
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/../../.."
 
-# go/tf-wildcard-import
-# pylint: disable=wildcard-import
-from tensorflow.contrib.bayesflow.python.ops.halton_sequence_impl import *
-# pylint: enable=wildcard-import
-from tensorflow.python.util.all_util import remove_undocumented
-
-_allowed_symbols = [
-    'sample',
-]
-
-remove_undocumented(__name__, _allowed_symbols)
+CC_PREFIX=arm-linux-gnueabihf- make -j 3 -f tensorflow/contrib/lite/Makefile TARGET=RPI TARGET_ARCH=armv7

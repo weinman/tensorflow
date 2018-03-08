@@ -784,7 +784,8 @@ class _InputPipeline(object):
       def _extract_key_names(tensor_or_dict):
         if tensor_or_dict is None:
           return []
-        return tensor_or_dict.keys() if isinstance(tensor_or_dict, dict) else []
+        return sorted(tensor_or_dict.keys()) if isinstance(
+            tensor_or_dict, dict) else []
 
       # Extract structure.
       has_labels = labels is not None
@@ -2308,6 +2309,11 @@ class _InputsWithStoppingSignals(_Inputs):
     """
 
     def _map_fn(*args):
+      """The map fn to insert signals."""
+      if len(args) == 1:
+        # Unpack the single Tensor/dict argument as features. This is required
+        # for the input_fn returns no labels.
+        args = args[0]
       features, labels = _Inputs._parse_inputs(args)
       new_input_dict = {}
       new_input_dict['features'] = features

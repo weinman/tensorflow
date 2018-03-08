@@ -12,40 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Csiszar f-Divergence and helpers.
+"""No-op utilities that provide static type hints.
 
-See ${python/contrib.bayesflow.csiszar_divergence}.
+These are used when the data type is not known at creation, for instance in the
+case of empty lists.
 """
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# go/tf-wildcard-import
-# pylint: disable=wildcard-import
-from tensorflow.contrib.bayesflow.python.ops.csiszar_divergence_impl import *
-# pylint: enable=wildcard-import
-from tensorflow.python.util.all_util import remove_undocumented
 
-_allowed_symbols = [
-    'amari_alpha',
-    'arithmetic_geometric',
-    'chi_square',
-    'csiszar_vimco',
-    'dual_csiszar_function',
-    'jeffreys',
-    'jensen_shannon',
-    'kl_forward',
-    'kl_reverse',
-    'log1p_abs',
-    'modified_gan',
-    'monte_carlo_csiszar_f_divergence',
-    'pearson',
-    'squared_hellinger',
-    'symmetrized_csiszar_function',
-    'total_variation',
-    't_power',
-    'triangular',
-]
+def set_element_type(entity, dtype, shape=None):
+  """Indicates that the entity is expected hold items of specified type.
 
-remove_undocumented(__name__, _allowed_symbols)
+  This function is a no-op. Its presence merely marks the data type of its
+  argument. The staged TensorFlow ops will reflect and assert this data type.
+
+  Args:
+    entity: A Tensor or TensorArray.
+    dtype: TensorFlow dtype value to assert for entity.
+    shape: Optional shape to assert for entity.
+  Returns:
+    The value of entity, unchanged.
+  """
+  del dtype
+  del shape
+  return entity

@@ -106,6 +106,7 @@ tf_cc_test(
         ":bfloat16_normalization",
         ":bfloat16_support",
         ":hlo",
+        ":hlo_verifier",
         "//tensorflow/compiler/xla:shape_util",
         "//tensorflow/compiler/xla:status_macros",
         "//tensorflow/compiler/xla:test",
@@ -988,6 +989,7 @@ tf_cc_test(
         "//tensorflow/compiler/xla:xla_data_proto",
         "//tensorflow/compiler/xla/tests:hlo_test_base",
         "//tensorflow/compiler/xla/tests:xla_internal_test_main",
+        "//tensorflow/compiler/xla/tools/parser:hlo_parser",
         "//tensorflow/core:lib",
     ],
 )
@@ -1060,6 +1062,38 @@ tf_cc_test(
         "//tensorflow/compiler/xla:status_macros",
         "//tensorflow/compiler/xla/tests:hlo_test_base",
         "//tensorflow/compiler/xla/tests:xla_internal_test_main",
+        "//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "hlo_module_group_metadata",
+    srcs = ["hlo_module_group_metadata.cc"],
+    hdrs = ["hlo_module_group_metadata.h"],
+    deps = [
+        ":hlo",
+        "//tensorflow/compiler/xla:shape_util",
+        "//tensorflow/compiler/xla:status",
+        "//tensorflow/compiler/xla:status_macros",
+        "//tensorflow/compiler/xla:statusor",
+        "//tensorflow/compiler/xla:util",
+        "//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "hlo_module_group_util",
+    srcs = ["hlo_module_group_util.cc"],
+    hdrs = ["hlo_module_group_util.h"],
+    deps = [
+        ":hlo",
+        ":hlo_module_group_metadata",
+        ":hlo_reachability",
+        "//tensorflow/compiler/xla:status",
+        "//tensorflow/compiler/xla:status_macros",
+        "//tensorflow/compiler/xla:statusor",
+        "//tensorflow/compiler/xla:types",
+        "//tensorflow/compiler/xla:util",
         "//tensorflow/core:lib",
     ],
 )
@@ -2386,6 +2420,24 @@ cc_library(
         ":hlo",
         ":hlo_proto",
         "//tensorflow/compiler/xla:status",
+        "//tensorflow/compiler/xla:util",
+    ],
+)
+
+tf_cc_test(
+    name = "hlo_proto_util_test",
+    srcs = ["hlo_proto_util_test.cc"],
+    deps = [
+        ":hlo",
+        ":hlo_proto",
+        ":hlo_proto_util",
+        "//tensorflow/compiler/xla:shape_util",
+        "//tensorflow/compiler/xla:status_macros",
+        "//tensorflow/compiler/xla:test",
+        "//tensorflow/compiler/xla:types",
+        "//tensorflow/compiler/xla/tests:hlo_test_base",
+        "//tensorflow/compiler/xla/tests:xla_internal_test_main",
+        "//tensorflow/core:lib",
     ],
 )
 
