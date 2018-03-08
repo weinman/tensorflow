@@ -30,6 +30,10 @@ namespace ctc {
 
 class Vocabulary {
   public:
+    Vocabulary(std::vector<std::vector<char>> vocab_list)
+    : vocab_size(vocab_list.size()),
+      vocabulary(vocab_list) {}
+
     Vocabulary(const char *vocab_path) {
       std::ifstream in(vocab_path);
       ReadFromFile(in);
