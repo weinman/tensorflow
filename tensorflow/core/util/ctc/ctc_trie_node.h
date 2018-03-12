@@ -56,8 +56,10 @@ class TrieNode {
     // we're building the trie from a SparseTensorValue
     // each insertion is a dense vector of int labels
     void Insert(std::vector<char> word) {
-      if (word.size() == 0) return;
       prefixCount++;
+      if (word.empty()) {
+        return;
+      }
       int wordChar = word.at(0);
       if (wordChar <= vocabSize && wordChar >=0 ) {
         // search for child node in word vector
@@ -67,7 +69,7 @@ class TrieNode {
         if (iter != children.end()) {
           child_node = iter->second;
         } else {
-          child_node = new TrieNode(wordChar, prefixCount);
+          child_node = new TrieNode(wordChar, prefixCount, vocabSize);
           children.emplace(wordChar, child_node);
         }
         word.erase(word.begin());

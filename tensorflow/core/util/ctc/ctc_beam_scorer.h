@@ -107,27 +107,35 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   void ExpandState(const TrieBeamState& from_state, int from_label,
                            TrieBeamState* to_state, int to_label)
                            const override {
+    CopyState(to_state, from_state);
+
     // In this case the prefix has a trie, indicating that it is a valid prefix within out dictionary
     // Ensure that from state has a trie node
     TrieNode *node;
+    std::cout << "from state:  " << from_label << std::endl;
     if ((node = from_state.incomplete_word_trie_node) == nullptr) {
-      std::cout << "from state nullptr" << std::endl;
+      std::cout << "from state nullptr:  " << from_label << std::endl;
       return;
     }
     // ensure that to state is a child of the from_state
-    if ((node = node->GetChildAt(to_label)) == nullptr) {
-      std::cout << "no to_label" << std::endl;
+    node = node->GetChildAt(to_label);
+    to_state->incomplete_word_trie_node = node;
+    if (node == nullptr) {
+      ResetIncompleteWord(to_state);
       return;
     }
 
-    CopyState(to_state, from_state);
     to_state->incomplete_word += to_label;
-    to_state->incomplete_word_trie_node = node;
+    std::cout << "expanded state;  from_label:  " << from_label
+              << ",  to_label:  " << to_label << std::endl;
   }
   // ExpandStateEnd is called after decoding has finished. Its purpose is to
   // allow a final scoring of the beam in its current state, before resorting
   // and retrieving the TopN requested candidates. Called at most once per beam.
-  void ExpandStateEnd(TrieBeamState* state) const override {}
+  void ExpandStateEnd(TrieBeamState* state) const override {
+    if (state->incomplete_word.size() > 0)
+      ResetIncompleteWord(state);
+  }
   // GetStateExpansionScore should be an inexpensive method to retrieve the
   // (cached) expansion score computed within ExpandState. The score is
   // multiplied (log-addition) with the input score at the current step from
@@ -137,6 +145,8 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // there's no state expansion logic, the expansion score is zero.
   float GetStateExpansionScore(const TrieBeamState& state,
                                        float previous_score) const override {
+    if (state.incomplete_word_trie_node == nullptr)
+      return 0;
     return previous_score;
   }
   // GetStateEndExpansionScore should be an inexpensive method to retrieve the
@@ -148,6 +158,10 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     return 0;
   }
 
+  TrieNode *GetTrieRoot() {
+    return trieRoot;
+  }
+
  private:
   Vocabulary *vocabulary;
   TrieNode *trieRoot;
@@ -155,6 +169,11 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   void CopyState(TrieBeamState* to_state, const TrieBeamState& from_state) const {
     to_state->incomplete_word_trie_node = from_state.incomplete_word_trie_node;
     to_state->incomplete_word = from_state.incomplete_word;
+  }
+
+  void ResetIncompleteWord(TrieBeamState* state) const {
+    state->incomplete_word.clear();
+    state->incomplete_word_trie_node = trieRoot;
   }
 }; // TrieBeamState
 

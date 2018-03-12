@@ -31,6 +31,55 @@ using tensorflow::ctc::TrieBeamScorer;
 using tensorflow::ctc::TrieBeamState;
 
 const char *dictionary_path = "./tensorflow/core/util/ctc/testdata/vocab";
+// "the quick brown fox jumped over the lazy dog"
+const int test_labels[] = {19, 7, 4, -65, 16, 20, 8, 2, 10, -65, 1, 17, 14, \
+  22, 13, -65, 5, 14, 23, -65, 9, 20, 12, 15, 4, 3, -65, 14, 21, 4, 17, -65, \
+  19, 7, 4, -65, 11, 0, 25, 24, -65, 3, 14, 6};
+const int test_label_count = 44;
+
+float ExpandBeamFn(TrieBeamScorer *scorer,
+  const int labels[],
+  const int label_count) {
+    TrieBeamState states[2];
+    scorer->InitializeState(&states[0]);
+
+    int from_label = -1;
+    std::wstring incomplete_word;
+    for (int i=0; i<label_count; ++i) {
+      int to_label = labels[i];
+      TrieBeamState &from_state = states[i%2];
+      TrieBeamState &to_state   = states[(i+1)%2];
+
+      scorer->ExpandState(from_state, from_label, &to_state, to_label);
+      incomplete_word = to_state.incomplete_word;
+
+      from_label = to_label;
+    }
+
+    TrieBeamState &endState = states[label_count%2];
+    scorer->ExpandStateEnd(&endState);
+    return 0.;
+  }
+
+TEST(CtcBeamSearch, ExpandState) {
+  std::vector<char> the    {19,  7,  4, -65};
+  std::vector<char> quick  {16, 20,  8,   2,  10, -65};
+  std::vector<char> brown  {1,  17, 14,  22,  13, -65};
+  std::vector<char> fox    {5,  14, 23, -65};
+  std::vector<char> jumped {9,  20, 12,  15,   4,   3, -65};
+  std::vector<char> over   {14, 21,  4,  17, -65};
+  std::vector<char> lazy   {11,  0, 25,  24, -65};
+  std::vector<char> dog    {3,  14,  6};
+  std::vector<std::vector<char>> vocab_list {the, quick, brown, fox, jumped, \
+    over, lazy, dog};
+
+  TrieBeamScorer *scorer = new TrieBeamScorer(vocab_list);
+  std::vector<char> trieLabels = scorer->GetTrieRoot()->GetTrieLabels();
+  for (char c : trieLabels) {
+    std::cout << (int)c << " " << std::endl;
+  }
+  ExpandBeamFn(scorer, test_labels, test_label_count);
+}
 
 TEST(CtcBeamSearch, DecodingWithAndWithoutDictionary) {
   const int batch_size = 1;
@@ -160,127 +209,4 @@ TEST(CtcBeamSearch, AllBeamElementsHaveFiniteScores) {
     EXPECT_FALSE(std::isinf(score[0][path]));
   }
 }
-
-// A beam decoder to test label selection. It simply models N labels with
-// rapidly dropping off log-probability.
-
-typedef int LabelState;  // The state is simply the final label.
-
-class RapidlyDroppingLabelScorer
-    : public tensorflow::ctc::BaseBeamScorer<LabelState> {
- public:
-  void InitializeState(LabelState* root) const override {}
-
-  void ExpandState(const LabelState& from_state, int from_label,
-                   LabelState* to_state, int to_label) const override {
-    *to_state = to_label;
-  }
-
-  void ExpandStateEnd(LabelState* state) const override {}
-
-  float GetStateExpansionScore(const LabelState& state,
-                               float previous_score) const override {
-    // Drop off rapidly for later labels.
-    const float kRapidly = 100;
-    return previous_score - kRapidly * state;
-  }
-
-  float GetStateEndExpansionScore(const LabelState& state) const override {
-    return 0;
-  }
-};
-
-TEST(CtcBeamSearch, LabelSelection) {
-  const int batch_size = 1;
-  const int timesteps = 3;
-  const int top_paths = 5;
-  const int num_classes = 6;
-
-  // Decoder which drops off log-probabilities for labels 0 >> 1 >> 2 >> 3.
-  RapidlyDroppingLabelScorer scorer;
-  CTCBeamSearchDecoder<LabelState> decoder(num_classes, top_paths, &scorer);
-
-  // Raw data containers (arrays of floats, ints, etc.).
-  int sequence_lengths[batch_size] = {timesteps};
-  // Log probabilities, slightly preferring later labels, this decision
-  // should be overridden by the scorer which strongly prefers earlier labels.
-  // The last one is empty label, and for simplicity  we give it an extremely
-  // high cost to ignore it. We also use the first label to break up the
-  // repeated label sequence.
-  float input_data_mat[timesteps][batch_size][num_classes] = {
-      {{-1e6, 1, 2, 3, 4, -1e6}},
-      {{1e6, 0, 0, 0, 0, -1e6}},  // force label 0 to break up repeated
-      {{-1e6, 1.1, 2.2, 3.3, 4.4, -1e6}},
-  };
-
-  // Expected output without label selection
-  std::vector<CTCDecoder::Output> expected_default_output = {
-      {{1, 0, 1}, {1, 0, 2}, {2, 0, 1}, {1, 0, 3}, {2, 0, 2}},
-  };
-
-  // Expected output with label selection limiting to 2 items
-  // this is suboptimal because only labels 3 and 4 were allowed to be seen.
-  std::vector<CTCDecoder::Output> expected_output_size2 = {
-      {{3, 0, 3}, {3, 0, 4}, {4, 0, 3}, {4, 0, 4}, {3}},
-  };
-
-  // Expected output with label width of 2.0. This would permit three labels at
-  // the first timestep, but only two at the last.
-  std::vector<CTCDecoder::Output> expected_output_width2 = {
-      {{2, 0, 3}, {2, 0, 4}, {3, 0, 3}, {3, 0, 4}, {4, 0, 3}},
-  };
-
-  // Convert data containers to the format accepted by the decoder, simply
-  // mapping the memory from the container to an Eigen::ArrayXi,::MatrixXf,
-  // using Eigen::Map.
-  Eigen::Map<const Eigen::ArrayXi> seq_len(&sequence_lengths[0], batch_size);
-  std::vector<Eigen::Map<const Eigen::MatrixXf>> inputs;
-  inputs.reserve(timesteps);
-  for (int t = 0; t < timesteps; ++t) {
-    inputs.emplace_back(&input_data_mat[t][0][0], batch_size, num_classes);
-  }
-
-  // Prepare containers for output and scores.
-  std::vector<CTCDecoder::Output> outputs(top_paths);
-  for (CTCDecoder::Output& output : outputs) {
-    output.resize(batch_size);
-  }
-  float score[batch_size][top_paths] = {{0.0}};
-  Eigen::Map<Eigen::MatrixXf> scores(&score[0][0], batch_size, top_paths);
-
-  EXPECT_TRUE(decoder.Decode(seq_len, inputs, &outputs, &scores).ok());
-  for (int path = 0; path < top_paths; ++path) {
-    EXPECT_EQ(outputs[path][0], expected_default_output[0][path]);
-  }
-
-  // Try label selection size 2
-  decoder.SetLabelSelectionParameters(2, -1);
-  EXPECT_TRUE(decoder.Decode(seq_len, inputs, &outputs, &scores).ok());
-  for (int path = 0; path < top_paths; ++path) {
-    EXPECT_EQ(outputs[path][0], expected_output_size2[0][path]);
-  }
-
-  // Try label selection width 2.0
-  decoder.SetLabelSelectionParameters(0, 2.0);
-  EXPECT_TRUE(decoder.Decode(seq_len, inputs, &outputs, &scores).ok());
-  for (int path = 0; path < top_paths; ++path) {
-    EXPECT_EQ(outputs[path][0], expected_output_width2[0][path]);
-  }
-
-  // Try both size 2 and width 2.0: the former is more constraining, so
-  // it's equivalent to that.
-  decoder.SetLabelSelectionParameters(2, 2.0);
-  EXPECT_TRUE(decoder.Decode(seq_len, inputs, &outputs, &scores).ok());
-  for (int path = 0; path < top_paths; ++path) {
-    EXPECT_EQ(outputs[path][0], expected_output_size2[0][path]);
-  }
-
-  // Size 4 and width > 3.3 are equivalent to no label selection
-  decoder.SetLabelSelectionParameters(4, 3.3001);
-  EXPECT_TRUE(decoder.Decode(seq_len, inputs, &outputs, &scores).ok());
-  for (int path = 0; path < top_paths; ++path) {
-    EXPECT_EQ(outputs[path][0], expected_default_output[0][path]);
-  }
-}
-
 }  // namespace
