@@ -57,18 +57,13 @@ class TrieNode {
     // each insertion is a dense vector of int labels
     void Insert(std::vector<char> word) {
       prefixCount++;
-      if (word.empty()) {
+      if (word.empty())
         return;
-      }
-      int wordChar = word.at(0);
+      char wordChar = word.at(0);
       if (wordChar <= vocabSize && wordChar >=0 ) {
         // search for child node in word vector
-        TrieMap::iterator iter;
-        iter = children.find(wordChar);
-        TrieNode *child_node;
-        if (iter != children.end()) {
-          child_node = iter->second;
-        } else {
+        TrieNode *child_node = GetChildAt(wordChar);
+        if (child_node == nullptr) {
           child_node = new TrieNode(wordChar, prefixCount, vocabSize);
           children.emplace(wordChar, child_node);
         }
