@@ -95,6 +95,11 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     for (std::vector<char> word : vocab_list) {
       trieRoot->Insert(word);
     }
+
+    for (TrieNode *n : trieRoot->GetChildren()) {
+      std::cout << (int)n->GetLabel() << " ";
+    }
+    std::cout << std::endl;
   }
 
   // State initialization
@@ -145,8 +150,10 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // there's no state expansion logic, the expansion score is zero.
   float GetStateExpansionScore(const TrieBeamState& state,
                                        float previous_score) const override {
+    /*
     if (state.incomplete_word_trie_node == nullptr)
       return 0;
+    */
     return previous_score;
   }
   // GetStateEndExpansionScore should be an inexpensive method to retrieve the

@@ -61,7 +61,7 @@ float ExpandBeamFn(TrieBeamScorer *scorer,
     return 0.;
   }
 
-TEST(CtcBeamSearch, ExpandState) {
+TEST(CtcBeamSearch, ExpandStateNoRepeatsNoBlanks) {
   std::vector<char> the    {19,  7,  4, -65};
   std::vector<char> quick  {16, 20,  8,   2,  10, -65};
   std::vector<char> brown  {1,  17, 14,  22,  13, -65};
@@ -70,14 +70,11 @@ TEST(CtcBeamSearch, ExpandState) {
   std::vector<char> over   {14, 21,  4,  17, -65};
   std::vector<char> lazy   {11,  0, 25,  24, -65};
   std::vector<char> dog    {3,  14,  6};
-  std::vector<std::vector<char>> vocab_list {the, quick, brown, fox, jumped, \
-    over, lazy, dog};
+  std::vector<std::vector<char>> vocab_list {
+    the, quick, brown, fox, jumped, over, lazy, dog};
 
   TrieBeamScorer *scorer = new TrieBeamScorer(vocab_list);
   std::vector<char> trieLabels = scorer->GetTrieRoot()->GetTrieLabels();
-  for (char c : trieLabels) {
-    std::cout << (int)c << " " << std::endl;
-  }
   ExpandBeamFn(scorer, test_labels, test_label_count);
 }
 
@@ -92,14 +89,11 @@ TEST(CtcBeamSearch, DecodingWithAndWithoutDictionary) {
   CTCBeamSearchDecoder<> decoder(num_classes, 10 * top_paths, &default_scorer);
 
   // Dictionary decoder, allowing only two dictionary words : {3}, {3, 1}.
-  std::vector<char> first;
-  first.push_back(3);
-  std::vector<char> second;
-  second.push_back(3);
-  second.push_back(1);
-  std::vector<std::vector<char>> dictionary;
-  dictionary.push_back(first);
-  dictionary.push_back(second);
+  std::vector<char> first  {3};
+  std::vector<char> second {3, 1};
+  std::vector<char> third  {1, 3};
+  std::vector<std::vector<char>> dictionary {first, second, third};
+
   TrieBeamScorer dictionary_scorer(dictionary);
   CTCBeamSearchDecoder<TrieBeamState> dictionary_decoder(
       num_classes, top_paths, &dictionary_scorer);
