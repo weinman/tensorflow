@@ -19,7 +19,7 @@ limitations under the License.
 #define TENSORFLOW_CORE_UTIL_CTC_CTC_TRIE_NODE_H_
 
 #include <algorithm>
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <vector>
 #include <iostream>
@@ -56,11 +56,11 @@ class TrieNode {
     // we're building the trie from a SparseTensorValue
     // each insertion is a dense vector of int labels
     void Insert(std::vector<char> word) {
-      prefixCount++;
       if (word.empty())
         return;
+      prefixCount++;
       char wordChar = word.at(0);
-      if (wordChar <= vocabSize && wordChar >=0 ) {
+      if (wordChar <= vocabSize && wordChar >= 0) {
         // search for child node in word vector
         TrieNode *child_node = GetChildAt(wordChar);
         if (child_node == nullptr) {

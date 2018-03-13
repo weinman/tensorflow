@@ -28,14 +28,6 @@ const char test_labels[] = {-1, 19, 7, 4, 16, 20, 8, 2, 10, 1, 17, 14, 22, 13,
 
 const char *vocabulary_path = "./tensorflow/core/util/ctc/testdata/vocab";
 
-void __createTrieNode(TrieNode *root, Vocabulary *vocab) {
-  std::vector<std::vector<char>> vocab_list = vocab->GetVocabList();
-  std::cout << vocab_list.size() << std::endl;
-  for (std::vector<char> word : vocab_list) {
-    root->Insert(word);
-  }
-}
-
 void __printTrie(TrieNode *root) {
   std::cout << root->GetLabel() << std::endl;
   for(TrieNode * c : root->GetChildren()) {
@@ -50,14 +42,18 @@ TEST(TrieNode, VocabularyFromFile) {
 
 TEST(TrieNode, TrieConstructionTest) {
   Vocabulary vocabulary(vocabulary_path);
-
+  
   TrieNode root(-1);
-  __createTrieNode(&root, &vocabulary);
+  std::vector<std::vector<char>> vocab_list = vocabulary.GetVocabList();
+  for (std::vector<char> word : vocab_list) {
+    root.Insert(word);
+  }
+
   __printTrie(&root);
 
   std::vector<char> node_labs = root.GetTrieLabels();
   std::cout << "Vector size:  " << node_labs.size() << std::endl;
-  for (int i=0; i < test_labels_count; ++i) {
+  for (int i=0; i < node_labs.size(); ++i) {
     EXPECT_EQ(node_labs.at(i), test_labels[i]);
   }
 }
