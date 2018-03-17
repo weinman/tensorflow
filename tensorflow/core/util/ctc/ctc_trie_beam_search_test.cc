@@ -32,10 +32,9 @@ using tensorflow::ctc::TrieBeamState;
 
 const char *dictionary_path = "./tensorflow/core/util/ctc/testdata/vocab";
 // "the quick brown fox jumped over the lazy dog"
-const int test_labels[] = {19, 7, 4, -65, 16, 20, 8, 2, 10, -65, 1, 17, 14, \
-  22, 13, -65, 5, 14, 23, -65, 9, 20, 12, 15, 4, 3, -65, 14, 21, 4, 17, -65, \
-  19, 7, 4, -65, 11, 0, 25, 24, -65, 3, 14, 6};
-const int test_label_count = 44;
+const int test_labels[] = {19, 7, 4, 16, 20, 8, 2, 10, 1, 17, 14, 22, 13, 5, 14,
+  23, 9, 20, 12, 15, 18, 14, 21, 4, 17, 19, 7, 4, 11, 0, 25, 24, 3, 14, 6};
+const int test_label_count = 35;
 
 float ExpandBeamFn(TrieBeamScorer *scorer,
   const int labels[],
@@ -44,6 +43,7 @@ float ExpandBeamFn(TrieBeamScorer *scorer,
     scorer->InitializeState(&states[0]);
 
     int from_label = -1;
+    float score = 0.0f;
     std::wstring incomplete_word;
     for (int i=0; i<label_count; ++i) {
       int to_label = labels[i];
@@ -51,31 +51,89 @@ float ExpandBeamFn(TrieBeamScorer *scorer,
       TrieBeamState &to_state   = states[(i+1)%2];
 
       scorer->ExpandState(from_state, from_label, &to_state, to_label);
-      incomplete_word = to_state.incomplete_word;
+      float new_score = scorer->GetStateExpansionScore(to_state, score);
 
+      incomplete_word = to_state.incomplete_word;
       from_label = to_label;
     }
 
     TrieBeamState &endState = states[label_count%2];
     scorer->ExpandStateEnd(&endState);
-    return 0.;
+    score += scorer->GetStateEndExpansionScore(endState);
+
+    return score;
   }
 
 TEST(CtcBeamSearch, ExpandStateNoRepeatsNoBlanks) {
-  std::vector<char> the    {19,  7,  4, -65};
-  std::vector<char> quick  {16, 20,  8,   2,  10, -65};
-  std::vector<char> brown  {1,  17, 14,  22,  13, -65};
-  std::vector<char> fox    {5,  14, 23, -65};
-  std::vector<char> jumped {9,  20, 12,  15,   4,   3, -65};
-  std::vector<char> over   {14, 21,  4,  17, -65};
-  std::vector<char> lazy   {11,  0, 25,  24, -65};
+  std::vector<char> the    {19,  7,  4};
+  std::vector<char> quick  {16, 20,  8,   2,  10};
+  std::vector<char> brown  {1,  17, 14,  22,  13};
+  std::vector<char> fox    {5,  14, 23};
+  std::vector<char> jumps  {9,  20, 12,  15,  18};
+  std::vector<char> over   {14, 21,  4,  17};
+  std::vector<char> lazy   {11,  0, 25,  24};
   std::vector<char> dog    {3,  14,  6};
   std::vector<std::vector<char>> vocab_list {
-    the, quick, brown, fox, jumped, over, lazy, dog};
+    the, quick, brown, fox, jumps, over, lazy, dog};
 
-  TrieBeamScorer *scorer = new TrieBeamScorer(vocab_list);
+  TrieBeamScorer *scorer = new TrieBeamScorer(vocab_list, true);
   std::vector<char> trieLabels = scorer->GetTrieRoot()->GetTrieLabels();
+  for (char c : trieLabels) {
+    std::cout << (int) c << " ";
+  }
+  std::cout << std::endl;
   ExpandBeamFn(scorer, test_labels, test_label_count);
+}
+
+TEST(CtcBeamSearch, ScoreState) {
+  const int batch_size = 1;
+  const int timesteps = 4;
+  const int top_paths = 1;
+  const int num_classes = 4;
+
+  std::vector<std::vector<char>> dictionary {{0, 1, 2}};
+  TrieBeamScorer scorer(dictionary, false);
+  CTCBeamSearchDecoder<TrieBeamState> decoder(
+      num_classes, 10 * top_paths, &scorer);
+
+  int sequence_lengths[batch_size] = {timesteps};
+  float input_data_mat[timesteps][batch_size][num_classes] = {
+    {{1, 0, 0, 0}},
+    {{0, 1, 0, 0}},
+    {{0, 0, 1, 0}},
+    {{0, 0, 0, 1}}};
+
+    for (int t = 0; t < timesteps; ++t) {
+      for (int b = 0; b < batch_size; ++b) {
+        for (int c = 0; c < num_classes; ++c) {
+          input_data_mat[t][b][c] = std::log(input_data_mat[t][b][c]);
+        }
+      }
+    }
+
+    std::vector<CTCDecoder::Output> expected_output = {
+      {{0, 1, 2}},
+    };
+
+    Eigen::Map<const Eigen::ArrayXi> seq_len(&sequence_lengths[0], batch_size);
+    std::vector<Eigen::Map<const Eigen::MatrixXf>> inputs;
+    inputs.reserve(timesteps);
+    for (int t = 0; t < timesteps; ++t) {
+      inputs.emplace_back(&input_data_mat[t][0][0], batch_size, num_classes);
+    }
+
+    // Prepare containers for output and scores.
+    std::vector<CTCDecoder::Output> outputs(top_paths);
+    for (CTCDecoder::Output& output : outputs) {
+      output.resize(batch_size);
+    }
+    float score[batch_size][top_paths] = {{0.0}};
+    Eigen::Map<Eigen::MatrixXf> scores(&score[0][0], batch_size, top_paths);
+
+    EXPECT_TRUE(decoder.Decode(seq_len, inputs, &outputs, &scores).ok());
+    for (int path = 0; path < top_paths; ++path) {
+      EXPECT_EQ(outputs[path][0], expected_output[0][path]);
+    }
 }
 
 TEST(CtcBeamSearch, DecodingWithAndWithoutDictionary) {
@@ -89,14 +147,14 @@ TEST(CtcBeamSearch, DecodingWithAndWithoutDictionary) {
   CTCBeamSearchDecoder<> decoder(num_classes, 10 * top_paths, &default_scorer);
 
   // Dictionary decoder, allowing only two dictionary words : {3}, {3, 1}.
-  std::vector<char> first  {3};
-  std::vector<char> second {3, 1};
-  std::vector<char> third  {1, 3};
-  std::vector<std::vector<char>> dictionary {first, second, third};
 
-  TrieBeamScorer dictionary_scorer(dictionary);
+  std::vector<std::vector<char>> dictionary {
+    {1}, {3}, {3,1}, {1,3,3,3,3}, {1,1,3,3,3}};
+
+
+  TrieBeamScorer dictionary_scorer(dictionary, false);
   CTCBeamSearchDecoder<TrieBeamState> dictionary_decoder(
-      num_classes, top_paths, &dictionary_scorer);
+      num_classes, 10 * top_paths, &dictionary_scorer);
 
   // Raw data containers (arrays of floats, ints, etc.).
   int sequence_lengths[batch_size] = {timesteps};
@@ -125,7 +183,7 @@ TEST(CtcBeamSearch, DecodingWithAndWithoutDictionary) {
   // second-candidate is there, despite it not being a dictionary word, due to
   // stronger probability in the input to the decoder.
   std::vector<CTCDecoder::Output> expected_dict_output = {
-      {{3}, {1, 3}, {3, 1}},
+      {{1, 3}, {3, 1}, {3}},
   };
 
   // Convert data containers to the format accepted by the decoder, simply
@@ -170,7 +228,7 @@ TEST(CtcBeamSearch, AllBeamElementsHaveFiniteScores) {
   const int num_classes = 6;
 
   // Plain decoder using hibernating beam search algorithm.
-  TrieBeamScorer dictionary_scorer(dictionary_path);
+  TrieBeamScorer dictionary_scorer(dictionary_path, false);
   CTCBeamSearchDecoder<TrieBeamState> decoder(num_classes, top_paths, &dictionary_scorer);
 
   // Raw data containers (arrays of floats, ints, etc.).

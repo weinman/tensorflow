@@ -33,19 +33,22 @@ class TrieNode {
   public:
     TrieNode(int vocabSize) : label(-1),
       prefixCount(0),
-      vocabSize(vocabSize) {
+      vocabSize(vocabSize),
+      endWord(false) {
         children.reserve(vocabSize);
       }
 
     TrieNode(int label, int vocabSize) : label(label),
       prefixCount(0),
-      vocabSize(vocabSize) {
+      vocabSize(vocabSize),
+      endWord(false) {
         children.reserve(vocabSize);
       }
 
     TrieNode(int label, int prefixCount, int vocabSize) : label(label),
       prefixCount(prefixCount),
-      vocabSize(vocabSize) {
+      vocabSize(vocabSize),
+      endWord(false) {
         children.reserve(vocabSize);
       }
 
@@ -56,8 +59,12 @@ class TrieNode {
     // we're building the trie from a SparseTensorValue
     // each insertion is a dense vector of int labels
     void Insert(std::vector<char> word) {
-      if (word.empty())
+      // if word we are inserting is the end, then set the appropriate flag
+      if (word.empty()) {
+        endWord = true;
         return;
+      }
+
       prefixCount++;
       char wordChar = word.at(0);
       if (wordChar <= vocabSize && wordChar >= 0) {
@@ -74,6 +81,10 @@ class TrieNode {
 
     char GetLabel() {
       return label;
+    }
+
+    bool IsEnd() {
+      return endWord;
     }
 
     TrieNode* GetChildAt(char label) {
@@ -121,6 +132,7 @@ class TrieNode {
     char label;
     int prefixCount;
     int vocabSize;
+    bool endWord;
     TrieMap children;
 
     void ReadNode(std::ifstream& in) {

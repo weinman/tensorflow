@@ -347,7 +347,6 @@ void CTCBeamSearchDecoder<CTCBeamState, CTCBeamComparer>::Step(
         c.newp.total = c.newp.label;
 
         if (is_candidate(c.newp)) {
-          std::cout << "candidate:  " << c.label << ":  " << c.newp.total << std::endl;
           // Before adding the new node to the beam, check if the beam
           // is already at maximum width.
           if (leaves_.size() == beam_width_) {

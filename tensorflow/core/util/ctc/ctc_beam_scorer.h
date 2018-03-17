@@ -27,6 +27,8 @@ limitations under the License.
 #include "tensorflow/core/util/ctc/ctc_beam_entry.h"
 #include "tensorflow/core/util/ctc/ctc_vocabulary.h"
 
+#include <limits>
+
 namespace tensorflow {
 namespace ctc {
 
@@ -78,30 +80,30 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     delete vocabulary;
     delete trieRoot;
   }
-  TrieBeamScorer(std::vector<std::vector<char>> vocab_list) {
-    vocabulary = new Vocabulary(vocab_list);
+  TrieBeamScorer(std::vector<std::vector<char>> vocab_list, bool multiWord) :
+    multiWord(multiWord) {
+      vocabulary = new Vocabulary(vocab_list);
 
-    trieRoot = new TrieNode(26);
-    for (std::vector<char> word : vocab_list) {
+      trieRoot = new TrieNode(26);
+      for (std::vector<char> word : vocab_list) {
+          trieRoot->Insert(word);
+      }
+    }
+  TrieBeamScorer(const char *dictionary_path, bool multiWord) :
+    multiWord(multiWord) {
+      vocabulary = new Vocabulary(dictionary_path);
+      std::vector<std::vector<char>> vocab_list = vocabulary->GetVocabList();
+
+      trieRoot = new TrieNode(26);
+      for (std::vector<char> word : vocab_list) {
         trieRoot->Insert(word);
+      }
+
+      for (TrieNode *n : trieRoot->GetChildren()) {
+        std::cout << (int)n->GetLabel() << " ";
+      }
+      std::cout << std::endl;
     }
-  }
-
-  TrieBeamScorer(const char *dictionary_path) {
-    vocabulary = new Vocabulary(dictionary_path);
-    std::vector<std::vector<char>> vocab_list = vocabulary->GetVocabList();
-
-    trieRoot = new TrieNode(26);
-    for (std::vector<char> word : vocab_list) {
-      trieRoot->Insert(word);
-    }
-
-    for (TrieNode *n : trieRoot->GetChildren()) {
-      std::cout << (int)n->GetLabel() << " ";
-    }
-    std::cout << std::endl;
-  }
-
   // State initialization
   void InitializeState(TrieBeamState* root) const override {
     root->incomplete_word_trie_node = trieRoot;
@@ -114,22 +116,31 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
                            const override {
     CopyState(to_state, from_state);
 
-    // In this case the prefix has a trie, indicating that it is a valid prefix within out dictionary
     // Ensure that from state has a trie node
     TrieNode *node;
-    std::cout << "from state:  " << from_label << std::endl;
-    if ((node = from_state.incomplete_word_trie_node) == nullptr) {
+    // sanity check
+    if ((node = to_state->incomplete_word_trie_node) == nullptr) {
       std::cout << "from state nullptr:  " << from_label << std::endl;
       return;
     }
+
+    if (node->IsEnd() && multiWord) {
+      std::cout << "from_word:  ";
+      std::cout << from_label;
+      std::cout << ";  word end... resetting" << std::endl;
+      ResetIncompleteWord(to_state);
+      node = to_state->incomplete_word_trie_node;
+    }
+
     // ensure that to state is a child of the from_state
     node = node->GetChildAt(to_label);
-    to_state->incomplete_word_trie_node = node;
     if (node == nullptr) {
-      ResetIncompleteWord(to_state);
+      to_state->incomplete_word.clear();
+      to_state->incomplete_word_trie_node = nullptr;
       return;
     }
 
+    to_state->incomplete_word_trie_node = node;
     to_state->incomplete_word += to_label;
     std::cout << "expanded state;  from_label:  " << from_label
               << ",  to_label:  " << to_label << std::endl;
@@ -138,8 +149,8 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // allow a final scoring of the beam in its current state, before resorting
   // and retrieving the TopN requested candidates. Called at most once per beam.
   void ExpandStateEnd(TrieBeamState* state) const override {
-    if (state->incomplete_word.size() > 0)
-      ResetIncompleteWord(state);
+    //std::wcout << "expand state end:  " << state->incomplete_word << std::endl;
+    //ResetIncompleteWord(state);
   }
   // GetStateExpansionScore should be an inexpensive method to retrieve the
   // (cached) expansion score computed within ExpandState. The score is
@@ -150,11 +161,10 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // there's no state expansion logic, the expansion score is zero.
   float GetStateExpansionScore(const TrieBeamState& state,
                                        float previous_score) const override {
-    /*
     if (state.incomplete_word_trie_node == nullptr)
-      return 0;
-    */
+      return -INFINITY;
     return previous_score;
+    // return previous_score;
   }
   // GetStateEndExpansionScore should be an inexpensive method to retrieve the
   // (cached) expansion score computed within ExpandStateEnd. The score is
@@ -162,6 +172,8 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   //
   // The score returned should be a log-probability.
   float GetStateEndExpansionScore(const TrieBeamState& state) const override {
+    if (!state.incomplete_word.empty())
+      return 1;
     return 0;
   }
 
@@ -172,6 +184,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
  private:
   Vocabulary *vocabulary;
   TrieNode *trieRoot;
+  bool multiWord;
 
   void CopyState(TrieBeamState* to_state, const TrieBeamState& from_state) const {
     to_state->incomplete_word_trie_node = from_state.incomplete_word_trie_node;
