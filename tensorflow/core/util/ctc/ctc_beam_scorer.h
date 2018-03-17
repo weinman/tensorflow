@@ -117,8 +117,8 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     CopyState(to_state, from_state);
 
     // Ensure that from state has a trie node
+    // If from state does not have a trie node, then we return without a state expansion
     TrieNode *node;
-    // sanity check
     if ((node = to_state->incomplete_word_trie_node) == nullptr) {
       std::cout << "from state nullptr:  " << from_label << std::endl;
       return;

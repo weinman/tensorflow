@@ -52,6 +52,7 @@ float ExpandBeamFn(TrieBeamScorer *scorer,
 
       scorer->ExpandState(from_state, from_label, &to_state, to_label);
       float new_score = scorer->GetStateExpansionScore(to_state, score);
+      score = new_score;
 
       incomplete_word = to_state.incomplete_word;
       from_label = to_label;
@@ -100,8 +101,7 @@ TEST(CtcBeamSearch, ScoreState) {
   float input_data_mat[timesteps][batch_size][num_classes] = {
     {{1, 0, 0, 0}},
     {{0, 1, 0, 0}},
-    {{0, 0, 1, 0}},
-    {{0, 0, 0, 1}}};
+    {{0, 0, 1, 0}}};
 
     for (int t = 0; t < timesteps; ++t) {
       for (int b = 0; b < batch_size; ++b) {
