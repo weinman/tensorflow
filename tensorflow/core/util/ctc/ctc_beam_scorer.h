@@ -112,38 +112,37 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // Called at most once per child beam. In the simplest case, no state
   // expansion is done.
   void ExpandState(const TrieBeamState& from_state, int from_label,
-                           TrieBeamState* to_state, int to_label)
-                           const override {
-    CopyState(to_state, from_state);
-
+                   TrieBeamState* to_state, int to_label) const override {
+   
     // Ensure that from state has a trie node
     // If from state does not have a trie node, then we return without a state expansion
     TrieNode *node;
-    if ((node = to_state->incomplete_word_trie_node) == nullptr) {
+    if ((node = from_state.incomplete_word_trie_node) == nullptr) {
       std::cout << "from state nullptr:  " << from_label << std::endl;
-      return;
-    }
-
-    if (node->IsEnd() && multiWord) {
-      std::cout << "from_word:  ";
-      std::cout << from_label;
-      std::cout << ";  word end... resetting" << std::endl;
-      ResetIncompleteWord(to_state);
-      node = to_state->incomplete_word_trie_node;
-    }
-
-    // ensure that to state is a child of the from_state
-    node = node->GetChildAt(to_label);
-    if (node == nullptr) {
-      to_state->incomplete_word.clear();
       to_state->incomplete_word_trie_node = nullptr;
       return;
     }
 
+    // the from state is not null, copy it to the to state and expand appropriately
+    CopyState(to_state, from_state);
+
+    // If the the from state is at a leaf of the trie, then set the to state to
+    // the root of the trie to expand from a new word
+    if (node->IsEnd() && multiWord) {
+      std::cout << "from_word:  " << from_label
+                << ";  word end... resetting" << std::endl;
+      ResetIncompleteWord(to_state);
+      node = to_state->incomplete_word_trie_node;
+    }
+
+    // set the node to be the child of the 
+    node = node->GetChildAt(to_label);
     to_state->incomplete_word_trie_node = node;
     to_state->incomplete_word += to_label;
-    std::cout << "expanded state;  from_label:  " << from_label
-              << ",  to_label:  " << to_label << std::endl;
+    if (to_state->incomplete_word_trie_node != nullptr) {
+      std::cout << "expanded state;  from_label:  " << from_label
+                << ",  to_label:  " << to_label << std::endl;
+    }
   }
   // ExpandStateEnd is called after decoding has finished. Its purpose is to
   // allow a final scoring of the beam in its current state, before resorting
@@ -160,7 +159,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // The score returned should be a log-probability. In the simplest case, as
   // there's no state expansion logic, the expansion score is zero.
   float GetStateExpansionScore(const TrieBeamState& state,
-                                       float previous_score) const override {
+                               float previous_score) const override {
     if (state.incomplete_word_trie_node == nullptr)
       return -INFINITY;
     return previous_score;
@@ -172,8 +171,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   //
   // The score returned should be a log-probability.
   float GetStateEndExpansionScore(const TrieBeamState& state) const override {
-    if (!state.incomplete_word.empty())
-      return 1;
+    if (state.incomplete_word_trie_node == nullptr) return -INFINITY;
     return 0;
   }
 
