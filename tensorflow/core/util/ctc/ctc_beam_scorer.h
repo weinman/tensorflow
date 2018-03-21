@@ -98,11 +98,6 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
       for (std::vector<char> word : vocab_list) {
         trieRoot->Insert(word);
       }
-
-      for (TrieNode *n : trieRoot->GetChildren()) {
-        std::cout << (int)n->GetLabel() << " ";
-      }
-      std::cout << std::endl;
     }
   // State initialization
   void InitializeState(TrieBeamState* root) const override {
@@ -118,7 +113,6 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     // If from state does not have a trie node, then we return without a state expansion
     TrieNode *node;
     if ((node = from_state.incomplete_word_trie_node) == nullptr) {
-      std::cout << "from state nullptr:  " << from_label << std::endl;
       to_state->incomplete_word_trie_node = nullptr;
       return;
     }
@@ -129,8 +123,6 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     // If the the from state is at a leaf of the trie, then set the to state to
     // the root of the trie to expand from a new word
     if (node->IsEnd() && multiWord) {
-      std::cout << "from_word:  " << from_label
-                << ";  word end... resetting" << std::endl;
       ResetIncompleteWord(to_state);
       node = to_state->incomplete_word_trie_node;
     }
@@ -139,17 +131,14 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     node = node->GetChildAt(to_label);
     to_state->incomplete_word_trie_node = node;
     to_state->incomplete_word += to_label;
-    if (to_state->incomplete_word_trie_node != nullptr) {
-      std::cout << "expanded state;  from_label:  " << from_label
-                << ",  to_label:  " << to_label << std::endl;
-    }
   }
   // ExpandStateEnd is called after decoding has finished. Its purpose is to
   // allow a final scoring of the beam in its current state, before resorting
   // and retrieving the TopN requested candidates. Called at most once per beam.
   void ExpandStateEnd(TrieBeamState* state) const override {
-    //std::wcout << "expand state end:  " << state->incomplete_word << std::endl;
-    //ResetIncompleteWord(state);
+    if (!state->incomplete_word_trie_node->IsEnd()) {
+      ResetIncompleteWord(state);
+    }
   }
   // GetStateExpansionScore should be an inexpensive method to retrieve the
   // (cached) expansion score computed within ExpandState. The score is

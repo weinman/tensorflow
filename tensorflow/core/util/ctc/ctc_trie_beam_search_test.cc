@@ -78,11 +78,6 @@ TEST(CtcBeamSearch, ExpandStateNoRepeatsNoBlanks) {
     the, quick, brown, fox, jumps, over, lazy, dog};
 
   TrieBeamScorer *scorer = new TrieBeamScorer(vocab_list, true);
-  std::vector<char> trieLabels = scorer->GetTrieRoot()->GetTrieLabels();
-  for (char c : trieLabels) {
-    std::cout << (int) c << " ";
-  }
-  std::cout << std::endl;
   ExpandBeamFn(scorer, test_labels, test_label_count);
 }
 
@@ -149,7 +144,8 @@ TEST(CtcBeamSearch, DecodingWithAndWithoutDictionary) {
   // Dictionary decoder, allowing only two dictionary words : {3}, {3, 1}.
 
   std::vector<std::vector<char>> dictionary {
-      {1,1,3,3,3}, {1,3,3,3,3}, {1,1,3,3}, {1,3,3,3}};
+      {1}, {1, 3}, {1, 3, 1}, {1, 3, 1, 3}, {1, 3, 1, 3, 1}, 
+      {3}, {3, 1}, {3, 1, 3}, {3, 1, 3, 1}, {3, 1, 3, 1, 3}};
 
 
   TrieBeamScorer dictionary_scorer(dictionary, false);
@@ -183,7 +179,7 @@ TEST(CtcBeamSearch, DecodingWithAndWithoutDictionary) {
   // second-candidate is there, despite it not being a dictionary word, due to
   // stronger probability in the input to the decoder.
   std::vector<CTCDecoder::Output> expected_dict_output = {
-      {{1, 3}, {3, 1}, {3}},
+      {{1, 3}, {1, 3, 1}, {3, 1, 3}},
   };
 
   // Convert data containers to the format accepted by the decoder, simply
