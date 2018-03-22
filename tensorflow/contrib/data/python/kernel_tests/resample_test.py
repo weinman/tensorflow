@@ -95,6 +95,7 @@ class ResampleTest(test.TestCase):
 
     get_next = dataset.make_one_shot_iterator().get_next()
 
+
     with self.test_session() as sess:
       returned = []
       with self.assertRaises(errors.OutOfRangeError):
