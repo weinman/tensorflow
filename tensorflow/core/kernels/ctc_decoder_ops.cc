@@ -348,14 +348,14 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
   void Compute(OpKernelContext* ctx) override {
     const Tensor* inputs;
     const Tensor* seq_len;
-    const Tensor* dictionary;
+    const Tensor* dictionary = nullptr;
     Tensor* log_prob = nullptr;
     OpOutputList decoded_indices;
     OpOutputList decoded_values;
     OpOutputList decoded_shape;
     OP_REQUIRES_OK(ctx, decode_helper_.ValidateInputsGenerateOutputs(
                             ctx, &inputs, &seq_len, &log_prob, &decoded_indices,
-                            &decoded_values, &decoded_shape), &dictionary);
+                            &decoded_values, &decoded_shape));
 
     auto inputs_t = inputs->tensor<float, 3>();
     auto seq_len_t = seq_len->vec<int32>();
@@ -382,9 +382,13 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
                                 batch_size, num_classes);
     }
 
-    ctc::CTCBeamSearchDecoder<> beam_search(num_classes, beam_width_,
-                                            &beam_scorer_, 1 /* batch_size */,
-                                            merge_repeated_);
+    std::vector<std::vector<char>> dictionary_vec;
+    ctc::TrieBeamScorer beam_scorer_(dictionary_vec, true);
+    ctc::CTCBeamSearchDecoder<ctc::TrieBeamState> beam_search(num_classes,
+                                                         beam_width_,
+                                                         &beam_scorer_,
+                                                         1 /* batch_size */,
+                                                         merge_repeated_);
     Tensor input_chip(DT_FLOAT, TensorShape({num_classes}));
     auto input_chip_t = input_chip.flat<float>();
 
@@ -419,7 +423,6 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
 
  private:
   CTCDecodeHelper decode_helper_;
-  ctc::CTCBeamSearchDecoder<>::DefaultBeamScorer beam_scorer_;
   bool merge_repeated_;
   int beam_width_;
   TF_DISALLOW_COPY_AND_ASSIGN(CTCBeamSearchDecoderTrieOp);
