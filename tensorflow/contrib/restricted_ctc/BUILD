@@ -5,42 +5,26 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-package(default_visibility = ["//visibility:public"])
+package(default_visibility = ["//tensorflow:__subpackages__"])
 
 load("//tensorflow:tensorflow.bzl", "tf_custom_op_py_library")
 load(
     "//tensorflow:tensorflow.bzl",
     "tf_custom_op_library",
-    "tf_cc_test",
-    "tf_py_test",
     "tf_gen_op_libs",
     "tf_kernel_library",
     "tf_gen_op_wrapper_py",
-)
-load(
-    "//tensorflow/core:platform/default/build_config.bzl",
-    "tf_kernel_tests_linkstatic",
-)
-
-cc_library(
-    name = "all_ops",
-    deps = ["ctc_beam_search_decoder_trie_ops_op_lib"],
-)
-
-cc_library(
-    name = "all_kernels",
-    deps = ["ctc_beam_search_decoder_trie_ops_kernels"],
 )
 
 tf_custom_op_py_library(
     name = "ctc_beam_search_decoder_trie_py",
     srcs = ["__init__.py"] + glob(["python/ops/*.py"]),
     dso = [
-        ":python/ops/_ctc_beam_search_decoder_ops.so",
+        ":python/ops/_ctc_beam_search_decoder_trie_ops.so",
     ],
     kernels = [
-        ":all_ops",
-        ":all_kernels",
+        ":ctc_beam_search_decoder_trie_ops_kernels",
+        ":ctc_beam_search_decoder_trie_ops_op_lib",
     ],
     srcs_version = "PY2AND3",
     visibility = ["//visibility:public"],
@@ -69,14 +53,15 @@ tf_custom_op_py_library(
 )
 
 tf_custom_op_library(
-    name = "python/ops/_ctc_beam_search_decoder_trie.so",
+    name = "python/ops/_ctc_beam_search_decoder_trie_ops.so",
     srcs = [
         "kernels/ctc_beam_search_decoder_trie_ops.cc",
-        "ops/ctc_beam_search_decoder_trie.cc"
+        "ops/ctc_beam_search_decoder_trie_ops.cc"
     ],
     deps = [
+        "//tensorflow/core/util/ctc:ctc_beam_search_lib",
         "//tensorflow/core/kernels:eigen_helpers",
-        "//tensorflow/core/kernels:ctc_ops",
+        "//tensorflow/core:ctc_ops_op_lib",
     ],
 )
 
@@ -86,19 +71,16 @@ tf_gen_op_wrapper_py(
 )
 
 tf_gen_op_libs(
-    op_lib_names = [
-        "ctc_beam_search_decoder_trie_ops",
-    ],
+    op_lib_names = ["ctc_beam_search_decoder_trie_ops"],
 )
 
 tf_kernel_library(
     name = "ctc_beam_search_decoder_trie_ops_kernels",
     prefix = "kernels/ctc_beam_search_decoder_trie_ops",
     deps = [
-        "//tensorflow/core:ctc_ops_op_lib",
-        "//tensorflow/core:framework",
+        "//tensorflow/core:framework_headers_lib",
         "//tensorflow/core:lib",
-        "//tensorflow/core/util/ctc:ctc_beam_search_lib",
-        "//tensorflow/core/util/ctc:ctc_loss_calculator_lib",
+        "//tensorflow/core/kernels:eigen_helpers",
+        "//third_party/eigen3",
     ],
 )

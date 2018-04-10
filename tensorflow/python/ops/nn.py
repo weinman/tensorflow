@@ -88,6 +88,7 @@ See the @{$python/nn} guide.
 @@ctc_loss
 @@ctc_greedy_decoder
 @@ctc_beam_search_decoder
+@@ctc_beam_search_decoder_trie
 @@top_k
 @@in_top_k
 @@nce_loss

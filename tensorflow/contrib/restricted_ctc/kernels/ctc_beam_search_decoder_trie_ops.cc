@@ -13,14 +13,148 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "tensorflow/core/kernels/ctc_decoder_ops.cc"
+#define EIGEN_USE_THREADS
+
+#include <limits>
+
+#include "tensorflow/core/framework/op_kernel.h"
+#include "tensorflow/core/framework/types.h"
+#include "tensorflow/core/lib/core/status.h"
+#include "tensorflow/core/platform/logging.h"
+#include "tensorflow/core/platform/macros.h"
+#include "tensorflow/core/util/ctc/ctc_beam_search.h"
+#include "tensorflow/core/util/sparse/sparse_tensor.h"
 
 namespace tensorflow {
+
+class CTCDecodeHelper {
+ public:
+  CTCDecodeHelper() : top_paths_(1) {}
+
+  inline int GetTopPaths() const { return top_paths_; }
+  void SetTopPaths(int tp) { top_paths_ = tp; }
+
+  Status ValidateInputsGenerateOutputs(
+      OpKernelContext* ctx, const Tensor** inputs, const Tensor** seq_len,
+      Tensor** log_prob, OpOutputList* decoded_indices,
+      OpOutputList* decoded_values, OpOutputList* decoded_shape) const {
+    Status status = ctx->input("inputs", inputs);
+    if (!status.ok()) return status;
+    status = ctx->input("sequence_length", seq_len);
+    if (!status.ok()) return status;
+
+    const TensorShape& inputs_shape = (*inputs)->shape();
+
+    if (inputs_shape.dims() != 3) {
+      return errors::InvalidArgument("inputs is not a 3-Tensor");
+    }
+
+    const int64 max_time = inputs_shape.dim_size(0);
+    const int64 batch_size = inputs_shape.dim_size(1);
+
+    if (max_time == 0) {
+      return errors::InvalidArgument("max_time is 0");
+    }
+    if (!TensorShapeUtils::IsVector((*seq_len)->shape())) {
+      return errors::InvalidArgument("sequence_length is not a vector");
+    }
+
+    if (!(batch_size == (*seq_len)->dim_size(0))) {
+      return errors::FailedPrecondition(
+          "len(sequence_length) != batch_size.  ",
+          "len(sequence_length):  ", (*seq_len)->dim_size(0),
+          " batch_size: ", batch_size);
+    }
+
+    auto seq_len_t = (*seq_len)->vec<int32>();
+
+    for (int b = 0; b < batch_size; ++b) {
+      if (!(seq_len_t(b) <= max_time)) {
+        return errors::FailedPrecondition("sequence_length(", b,
+                                          ") <= ", max_time);
+      }
+    }
+
+    Status s = ctx->allocate_output(
+        "log_probability", TensorShape({batch_size, top_paths_}), log_prob);
+    if (!s.ok()) return s;
+
+    s = ctx->output_list("decoded_indices", decoded_indices);
+    if (!s.ok()) return s;
+    s = ctx->output_list("decoded_values", decoded_values);
+    if (!s.ok()) return s;
+    s = ctx->output_list("decoded_shape", decoded_shape);
+    if (!s.ok()) return s;
+
+    return Status::OK();
+  }
+
+  // sequences[b][p][ix] stores decoded value "ix" of path "p" for batch "b".
+  Status StoreAllDecodedSequences(
+      const std::vector<std::vector<std::vector<int> > >& sequences,
+      OpOutputList* decoded_indices, OpOutputList* decoded_values,
+      OpOutputList* decoded_shape) const {
+    // Calculate the total number of entries for each path
+    const int64 batch_size = sequences.size();
+    std::vector<int64> num_entries(top_paths_, 0);
+
+    // Calculate num_entries per path
+    for (const auto& batch_s : sequences) {
+      CHECK_EQ(batch_s.size(), top_paths_);
+      for (int p = 0; p < top_paths_; ++p) {
+        num_entries[p] += batch_s[p].size();
+      }
+    }
+
+    for (int p = 0; p < top_paths_; ++p) {
+      Tensor* p_indices = nullptr;
+      Tensor* p_values = nullptr;
+      Tensor* p_shape = nullptr;
+
+      const int64 p_num = num_entries[p];
+
+      Status s =
+          decoded_indices->allocate(p, TensorShape({p_num, 2}), &p_indices);
+      if (!s.ok()) return s;
+      s = decoded_values->allocate(p, TensorShape({p_num}), &p_values);
+      if (!s.ok()) return s;
+      s = decoded_shape->allocate(p, TensorShape({2}), &p_shape);
+      if (!s.ok()) return s;
+
+      auto indices_t = p_indices->matrix<int64>();
+      auto values_t = p_values->vec<int64>();
+      auto shape_t = p_shape->vec<int64>();
+
+      int64 max_decoded = 0;
+      int64 offset = 0;
+
+      for (int64 b = 0; b < batch_size; ++b) {
+        auto& p_batch = sequences[b][p];
+        int64 num_decoded = p_batch.size();
+        max_decoded = std::max(max_decoded, num_decoded);
+        std::copy_n(p_batch.begin(), num_decoded, &values_t(offset));
+        for (int64 t = 0; t < num_decoded; ++t, ++offset) {
+          indices_t(offset, 0) = b;
+          indices_t(offset, 1) = t;
+        }
+      }
+
+      shape_t(0) = batch_size;
+      shape_t(1) = max_decoded;
+    }
+    return Status::OK();
+  }
+
+ private:
+  int top_paths_;
+  TF_DISALLOW_COPY_AND_ASSIGN(CTCDecodeHelper);
+};
 
 // CTC beam search trie
 class CTCBeamSearchDecoderTrieOp : public OpKernel {
  public:
-  explicit CTCBeamSearchDecoderTrieOp(OpKernelConstruction* ctx) : OpKernel(ctx) {
+  explicit CTCBeamSearchDecoderTrieOp(OpKernelConstruction* ctx):
+   OpKernel(ctx) {
     OP_REQUIRES_OK(ctx, ctx->GetAttr("merge_repeated", &merge_repeated_));
     OP_REQUIRES_OK(ctx, ctx->GetAttr("beam_width", &beam_width_));
     int top_paths;

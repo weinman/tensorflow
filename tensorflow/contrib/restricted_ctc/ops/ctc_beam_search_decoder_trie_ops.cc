@@ -66,5 +66,5 @@ REGISTER_OP("CTCBeamSearchDecoderTrie")
       c->set_output(out_idx++, c->Matrix(batch_size, top_paths));
       return Status::OK();
     });
-  
+
 }  // end namespace tensorflow

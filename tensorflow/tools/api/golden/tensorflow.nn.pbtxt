@@ -89,6 +89,10 @@ tf_module {
     argspec: "args=[\'features\', \'name\', \'axis\'], varargs=None, keywords=None, defaults=[\'None\', \'-1\'], "
   }
   member_method {
+    name: "ctc_beam_search_decoder_trie"
+    argspec: "args=[\'inputs\', \'sequence_length\', \'dictionary\', \'beam_width\', \'top_paths\', \'merge_repeated\'], varargs=None, keywords=None, defaults=[\'100\', \'1\', \'True\'], "
+  }
+  member_method {
     name: "ctc_beam_search_decoder"
     argspec: "args=[\'inputs\', \'sequence_length\', \'beam_width\', \'top_paths\', \'merge_repeated\'], varargs=None, keywords=None, defaults=[\'100\', \'1\', \'True\'], "
   }

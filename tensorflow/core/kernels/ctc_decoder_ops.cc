@@ -337,7 +337,8 @@ REGISTER_KERNEL_BUILDER(Name("CTCBeamSearchDecoder").Device(DEVICE_CPU),
 // CTC beam search trie
 class CTCBeamSearchDecoderTrieOp : public OpKernel {
  public:
-  explicit CTCBeamSearchDecoderTrieOp(OpKernelConstruction* ctx) : OpKernel(ctx) {
+  explicit CTCBeamSearchDecoderTrieOp(OpKernelConstruction* ctx):
+   OpKernel(ctx) {
     OP_REQUIRES_OK(ctx, ctx->GetAttr("merge_repeated", &merge_repeated_));
     OP_REQUIRES_OK(ctx, ctx->GetAttr("beam_width", &beam_width_));
     int top_paths;

@@ -286,7 +286,7 @@ def ctc_beam_search_decoder(inputs, sequence_length, beam_width=100,
 def ctc_beam_search_decoder_trie(inputs, sequence_length, dictionary, beam_width=100,
                                  top_paths=1, merge_repeated=True):
   decoded_ixs, decoded_vals, decoded_shapes, log_probabilities = (
-      gen_ctc_ops.ctc_beam_search_decoder(
+      gen_ctc_ops.ctc_beam_search_decoder_trie(
           inputs, sequence_length, dictionary, beam_width=beam_width,
           top_paths=top_paths, merge_repeated=merge_repeated))
 
@@ -302,4 +302,4 @@ ops.NotDifferentiable("CTCGreedyDecoder")
 ops.NotDifferentiable("CTCBeamSearchDecoder")
 
 
-ops.NotDifferentiable("CTCBeamsearchdecoderTrie")
+ops.NotDifferentiable("CTCBeamSearchDecoderTrie")
