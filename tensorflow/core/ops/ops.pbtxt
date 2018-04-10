@@ -7414,6 +7414,14 @@ op {
       s: ""
     }
   }
+  attr {
+    name: "select_cols"
+    type: "list(int)"
+    default_value {
+      list {
+      }
+    }
+  }
 }
 op {
   name: "DecodeCompressed"
