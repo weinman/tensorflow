@@ -144,9 +144,11 @@ REGISTER_OP("CTCBeamSearchDecoderTrie")
     .SetShapeFn([](InferenceContext* c) {
       ShapeHandle inputs;
       ShapeHandle sequence_length;
+      ShapeHandle dictionary;
 
       TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 3, &inputs));
       TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 1, &sequence_length));
+      TF_RETURN_IF_ERROR(c->WithRank(c->input(2), 2, &dictionary));
 
       // Get batch size from inputs and sequence_length.
       DimensionHandle batch_size;

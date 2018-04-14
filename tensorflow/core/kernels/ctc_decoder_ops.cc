@@ -359,7 +359,7 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
   void Compute(OpKernelContext* ctx) override {
     const Tensor* inputs;
     const Tensor* seq_len;
-    const Tensor* dictionary = nullptr;
+    const Tensor* dictionary;
     Tensor* log_prob = nullptr;
     OpOutputList decoded_indices;
     OpOutputList decoded_values;
@@ -368,11 +368,20 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
                             ctx, &inputs, &seq_len, &log_prob, &decoded_indices,
                             &decoded_values, &decoded_shape));
 
+    // populate dictionary with context value
+    ctx->input("dictionary", &dictionary);
+
     auto inputs_t = inputs->tensor<float, 3>();
     auto seq_len_t = seq_len->vec<int32>();
-    // TODO: get dictionary length
-    auto dictionary_t = dictionary->tensor<int32, 1>();
+    auto dictionary_t = dictionary->tensor<int32, 2>();
     auto log_prob_t = log_prob->matrix<float>();
+
+    // Validate dictionary shape
+    const TensorShape& dictionary_shape = dictionary->shape();
+    std::cout << dictionary_shape << std::endl;
+    if (dictionary_shape.dims() != 2) {
+        errors::InvalidArgument("dictionary is not a 2-Tensor");
+    }
 
     const TensorShape& inputs_shape = inputs->shape();
 
