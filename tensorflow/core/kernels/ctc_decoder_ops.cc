@@ -376,13 +376,6 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
     auto dictionary_t = dictionary->tensor<int32, 2>();
     auto log_prob_t = log_prob->matrix<float>();
 
-    // Validate dictionary shape
-    const TensorShape& dictionary_shape = dictionary->shape();
-    std::cout << dictionary_shape << std::endl;
-    if (dictionary_shape.dims() != 2) {
-        errors::InvalidArgument("dictionary is not a 2-Tensor");
-    }
-
     const TensorShape& inputs_shape = inputs->shape();
 
     const int64 max_time = inputs_shape.dim_size(0);
@@ -401,6 +394,17 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
       input_list_t.emplace_back(inputs_t.data() + t * batch_size * num_classes,
                                 batch_size, num_classes);
     }
+
+    // Validate dictionary shape
+    const TensorShape& dictionary_shape = dictionary->shape();
+    std::cout << dictionary_shape << std::endl;
+    std::cout << dictionary_t << std::endl;
+    if (dictionary_shape.dims() != 2) {
+        errors::InvalidArgument("dictionary is not a 2-Tensor");
+    }
+
+    // create dictionary trie
+    
 
     std::vector<std::vector<char>> dictionary_vec;
     ctc::TrieBeamScorer beam_scorer_(dictionary_vec, true);
