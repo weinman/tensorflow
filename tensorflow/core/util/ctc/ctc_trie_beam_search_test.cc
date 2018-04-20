@@ -66,18 +66,18 @@ float ExpandBeamFn(TrieBeamScorer *scorer,
   }
 
 TEST(CtcBeamSearch, ExpandStateNoRepeatsNoBlanks) {
-  std::vector<char> the    {19,  7,  4};
-  std::vector<char> quick  {16, 20,  8,   2,  10};
-  std::vector<char> brown  {1,  17, 14,  22,  13};
-  std::vector<char> fox    {5,  14, 23};
-  std::vector<char> jumps  {9,  20, 12,  15,  18};
-  std::vector<char> over   {14, 21,  4,  17};
-  std::vector<char> lazy   {11,  0, 25,  24};
-  std::vector<char> dog    {3,  14,  6};
-  std::vector<std::vector<char>> vocab_list {
+  std::vector<int> the    {19,  7,  4};
+  std::vector<int> quick  {16, 20,  8,   2,  10};
+  std::vector<int> brown  {1,  17, 14,  22,  13};
+  std::vector<int> fox    {5,  14, 23};
+  std::vector<int> jumps  {9,  20, 12,  15,  18};
+  std::vector<int> over   {14, 21,  4,  17};
+  std::vector<int> lazy   {11,  0, 25,  24};
+  std::vector<int> dog    {3,  14,  6};
+  std::vector<std::vector<int>> vocab_list {
     the, quick, brown, fox, jumps, over, lazy, dog};
 
-  TrieBeamScorer *scorer = new TrieBeamScorer(vocab_list, true);
+  TrieBeamScorer *scorer = new TrieBeamScorer(vocab_list, 26, true);
   ExpandBeamFn(scorer, test_labels, test_label_count);
 }
 
@@ -87,8 +87,8 @@ TEST(CtcBeamSearch, ScoreState) {
   const int top_paths = 1;
   const int num_classes = 4;
 
-  std::vector<std::vector<char>> dictionary {{0, 1, 2}};
-  TrieBeamScorer scorer(dictionary, false);
+  std::vector<std::vector<int>> dictionary {{0, 1, 2}};
+  TrieBeamScorer scorer(dictionary, 26, false);
   CTCBeamSearchDecoder<TrieBeamState> decoder(
       num_classes, 10 * top_paths, &scorer);
 
@@ -143,12 +143,12 @@ TEST(CtcBeamSearch, DecodingWithAndWithoutDictionary) {
 
   // Dictionary decoder, allowing only two dictionary words : {3}, {3, 1}.
 
-  std::vector<std::vector<char>> dictionary {
-      {1}, {1, 3}, {1, 3, 1}, {1, 3, 1, 3}, {1, 3, 1, 3, 1}, 
+  std::vector<std::vector<int>> dictionary {
+      {1}, {1, 3}, {1, 3, 1}, {1, 3, 1, 3}, {1, 3, 1, 3, 1},
       {3}, {3, 1}, {3, 1, 3}, {3, 1, 3, 1}, {3, 1, 3, 1, 3}};
 
 
-  TrieBeamScorer dictionary_scorer(dictionary, false);
+  TrieBeamScorer dictionary_scorer(dictionary, 26, false);
   CTCBeamSearchDecoder<TrieBeamState> dictionary_decoder(
       num_classes, 10 * top_paths, &dictionary_scorer);
 
@@ -222,11 +222,11 @@ TEST(CtcBeamSearch, DecodingWithRestrictDict) {
   const int timesteps = 5;
   const int top_paths = 2;
   const int num_classes = 6;
-  
-  // Dictionary decoder, allowing only two dictionary words : {3}, {3, 1}.
-  std::vector<std::vector<char>> dictionary {{3}, {3, 1}};
 
-  TrieBeamScorer dictionary_scorer(dictionary, false);
+  // Dictionary decoder, allowing only two dictionary words : {3}, {3, 1}.
+  std::vector<std::vector<int>> dictionary {{3}, {3, 1}};
+
+  TrieBeamScorer dictionary_scorer(dictionary, 229, false);
   CTCBeamSearchDecoder<TrieBeamState> dictionary_decoder(
       num_classes, 10 * top_paths, &dictionary_scorer);
 
@@ -247,7 +247,7 @@ TEST(CtcBeamSearch, DecodingWithRestrictDict) {
       }
     }
   }
-  
+
   // Dictionary outputs: preference for dictionary candidates. The
   // second-candidate is there, despite it not being a dictionary word, due to
   // stronger probability in the input to the decoder.
@@ -268,7 +268,7 @@ TEST(CtcBeamSearch, DecodingWithRestrictDict) {
   // Prepare containers scores.
   float score[batch_size][top_paths] = {{0.0}};
   Eigen::Map<Eigen::MatrixXf> scores(&score[0][0], batch_size, top_paths);
-  
+
   // Prepare dictionary outputs.
   std::vector<CTCDecoder::Output> dict_outputs(top_paths);
   for (CTCDecoder::Output& output : dict_outputs) {
@@ -288,8 +288,9 @@ TEST(CtcBeamSearch, AllBeamElementsHaveFiniteScores) {
   const int num_classes = 6;
 
   // Plain decoder using hibernating beam search algorithm.
-  TrieBeamScorer dictionary_scorer(dictionary_path, false);
-  CTCBeamSearchDecoder<TrieBeamState> decoder(num_classes, top_paths, &dictionary_scorer);
+  TrieBeamScorer dictionary_scorer(dictionary_path, 26, false);
+  CTCBeamSearchDecoder<TrieBeamState> decoder(num_classes, top_paths,
+     &dictionary_scorer);
 
   // Raw data containers (arrays of floats, ints, etc.).
   int sequence_lengths[batch_size] = {timesteps};

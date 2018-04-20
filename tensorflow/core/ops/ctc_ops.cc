@@ -133,6 +133,7 @@ REGISTER_OP("CTCBeamSearchDecoder")
 REGISTER_OP("CTCBeamSearchDecoderTrie")
     .Input("inputs: float")
     .Input("sequence_length: int32")
+    .Input("alphabet_size: int32")
     .Input("dictionary: int32")
     .Attr("beam_width: int >= 1")
     .Attr("top_paths: int >= 1")
@@ -144,11 +145,13 @@ REGISTER_OP("CTCBeamSearchDecoderTrie")
     .SetShapeFn([](InferenceContext* c) {
       ShapeHandle inputs;
       ShapeHandle sequence_length;
+      ShapeHandle alphabet_size;
       ShapeHandle dictionary;
 
       TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 3, &inputs));
       TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 1, &sequence_length));
-      TF_RETURN_IF_ERROR(c->WithRank(c->input(2), 2, &dictionary));
+      TF_RETURN_IF_ERROR(c->WithRank(c->input(2), 0, &alphabet_size));
+      TF_RETURN_IF_ERROR(c->WithRank(c->input(3), 2, &dictionary));
 
       // Get batch size from inputs and sequence_length.
       DimensionHandle batch_size;

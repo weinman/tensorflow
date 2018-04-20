@@ -21,8 +21,8 @@ namespace {
 using tensorflow::ctc::TrieNode;
 using tensorflow::ctc::Vocabulary;
 
-const char test_labels_count = 35;
-const char test_labels[] = {-1, 19, 7, 4, 16, 20, 8, 2, 10, 1, 17, 14, 22, 13,
+const int32 test_labels_count = 35;
+const int32 test_labels[] = {-1, 19, 7, 4, 16, 20, 8, 2, 10, 1, 17, 14, 22, 13,
                             5, 14, 23, 9, 20, 12, 15, 4, 3, 14, 21, 4, 17, 0,
                             11, 0, 25, 24, 3, 14, 6};
 
@@ -42,16 +42,16 @@ TEST(TrieNode, VocabularyFromFile) {
 
 TEST(TrieNode, TrieConstructionTest) {
   Vocabulary vocabulary(vocabulary_path);
-  
+
   TrieNode root(-1);
-  std::vector<std::vector<char>> vocab_list = vocabulary.GetVocabList();
-  for (std::vector<char> word : vocab_list) {
+  std::vector<std::vector<int32>> vocab_list = vocabulary.GetVocabList();
+  for (std::vector<int32> word : vocab_list) {
     root.Insert(word);
   }
 
   __printTrie(&root);
 
-  std::vector<char> node_labs = root.GetTrieLabels();
+  std::vector<int32> node_labs = root.GetTrieLabels();
   std::cout << "Vector size:  " << node_labs.size() << std::endl;
   for (int i=0; i < node_labs.size(); ++i) {
     EXPECT_EQ(node_labs.at(i), test_labels[i]);

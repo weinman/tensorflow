@@ -359,6 +359,7 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
   void Compute(OpKernelContext* ctx) override {
     const Tensor* inputs;
     const Tensor* seq_len;
+    const Tensor* alphabet_size;
     const Tensor* dictionary;
     Tensor* log_prob = nullptr;
     OpOutputList decoded_indices;
@@ -370,9 +371,11 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
 
     // populate dictionary with context value
     ctx->input("dictionary", &dictionary);
+    ctx->input("alphabet_size", &alphabet_size);
 
     auto inputs_t = inputs->tensor<float, 3>();
     auto seq_len_t = seq_len->vec<int32>();
+    auto alpha_sz_t = alphabet_size->scalar<int32>()();
     auto dictionary_t = dictionary->tensor<int32, 2>();
     auto log_prob_t = log_prob->matrix<float>();
 
@@ -381,6 +384,8 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
     const int64 max_time = inputs_shape.dim_size(0);
     const int64 batch_size = inputs_shape.dim_size(1);
     const int64 num_classes_raw = inputs_shape.dim_size(2);
+    // TF_RETURN_IF_ERROR();
+
     OP_REQUIRES(
         ctx, FastBoundsCheck(num_classes_raw, std::numeric_limits<int>::max()),
         errors::InvalidArgument("num_classes cannot exceed max int"));
@@ -395,6 +400,17 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
                                 batch_size, num_classes);
     }
 
+    /*
+    OP_REQURES_OK(ctx, decoder_helper_.ValidateDictionaryArguments(
+                           ctx, &alphabet_size, &dictionary, num_classes_raw));
+    */
+
+
+    // validate alphabet size
+    if (num_classes_raw < alpha_sz_t) {
+        errors::InvalidArgument("dictionary alphabet exceeds num_classes");
+    }
+
     // Validate dictionary shape
     const TensorShape& dictionary_shape = dictionary->shape();
     std::cout << dictionary_shape << std::endl;
@@ -403,11 +419,22 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
         errors::InvalidArgument("dictionary is not a 2-Tensor");
     }
 
-    // create dictionary trie
-    
+    // construct vocabulary from input dictionary
+    std::vector<std::vector<int32>> dictionary_vec;
+    const int64 num_words = dictionary_shape.dim_size(0);
+    const int64 max_len = dictionary_shape.dim_size(1);
+    for (int w=0; w<num_words; ++w) {
+      std::vector<int32> word;
+      for (int c=0; c <max_len; ++c) {
+        int32 val = dictionary_t(w,c);
+        if (val == 0)
+          break;
+        word.push_back(val);
+      }
+      dictionary_vec.push_back(word);
+    }
 
-    std::vector<std::vector<char>> dictionary_vec;
-    ctc::TrieBeamScorer beam_scorer_(dictionary_vec, true);
+    ctc::TrieBeamScorer beam_scorer_(dictionary_vec, alpha_sz_t, true);
     ctc::CTCBeamSearchDecoder<ctc::TrieBeamState> beam_search(num_classes,
                                                          beam_width_,
                                                          &beam_scorer_,

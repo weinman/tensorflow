@@ -30,7 +30,7 @@ namespace ctc {
 
 class Vocabulary {
   public:
-    Vocabulary(std::vector<std::vector<char>> vocab_list)
+    Vocabulary(std::vector<std::vector<int32>> vocab_list)
     : vocab_size(vocab_list.size()),
       vocabulary(vocab_list) {}
 
@@ -48,12 +48,12 @@ class Vocabulary {
       return vocab_size;
     }
 
-    std::vector<std::vector<char>> GetVocabList() {
+    std::vector<std::vector<int32>> GetVocabList() {
       return vocabulary;
     }
 
     void PrintVocab() {
-      for (std::vector<char> word : vocabulary) {
+      for (std::vector<int32> word : vocabulary) {
         for (int wChar : word) {
           if (wChar >= 0 && wChar <= 26) {
             std::cout << wChar << " ";
@@ -64,13 +64,13 @@ class Vocabulary {
 
   private:
     int vocab_size;
-    std::vector<std::vector<char>> vocabulary;
+    std::vector<std::vector<int32>> vocabulary;
 
     void ReadFromFile(std::ifstream& in) {
       vocab_size = 0;
       std::string str;
       while (std::getline(in, str)) {
-        std::vector<char> ret;
+        std::vector<int32> ret;
         for (int i=0; i<str.length(); ++i) {
           ret.push_back(str.at(i) - 'a');
         }

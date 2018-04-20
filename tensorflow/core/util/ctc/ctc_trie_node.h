@@ -58,7 +58,7 @@ class TrieNode {
 
     // we're building the trie from a SparseTensorValue
     // each insertion is a dense vector of int labels
-    void Insert(std::vector<char> word) {
+    void Insert(std::vector<int32> word) {
       // if word we are inserting is the end, then set the appropriate flag
       if (word.empty()) {
         endWord = true;
@@ -66,7 +66,7 @@ class TrieNode {
       }
 
       prefixCount++;
-      char wordChar = word.at(0);
+      int32 wordChar = word.at(0);
       if (wordChar <= vocabSize && wordChar >= 0) {
         // search for child node in word vector
         TrieNode *child_node = GetChildAt(wordChar);
@@ -79,7 +79,7 @@ class TrieNode {
       }
     }
 
-    char GetLabel() {
+    int32 GetLabel() {
       return label;
     }
 
@@ -87,15 +87,15 @@ class TrieNode {
       return endWord;
     }
 
-    TrieNode* GetChildAt(char label) {
+    TrieNode* GetChildAt(int32 label) {
       auto iter = children.find(label);
       if (iter != children.end())
         return iter->second;
       return nullptr;
     }
 
-    std::vector<char> GetTrieLabels() {
-      std::vector<char> labs;
+    std::vector<int32> GetTrieLabels() {
+      std::vector<int32> labs;
       labs = __GetTrieLabels(labs);
       return labs;
     }
@@ -127,9 +127,9 @@ class TrieNode {
     }
 
   private:
-    typedef std::unordered_map<char, TrieNode*> TrieMap;
+    typedef std::unordered_map<int32, TrieNode*> TrieMap;
 
-    char label;
+    int32 label;
     int prefixCount;
     int vocabSize;
     bool endWord;
@@ -139,7 +139,7 @@ class TrieNode {
       in >> label >> prefixCount;
     }
 
-    std::vector<char> __GetTrieLabels(std::vector<char> labs) {
+    std::vector<int32> __GetTrieLabels(std::vector<int32> labs) {
       labs.push_back(label);
       for (const auto& c : children) {
         labs = c.second->__GetTrieLabels(labs);

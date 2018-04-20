@@ -80,25 +80,29 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     delete vocabulary;
     delete trieRoot;
   }
-  TrieBeamScorer(std::vector<std::vector<char>> vocab_list, bool multiWord) :
+
+  TrieBeamScorer(std::vector<std::vector<int32>> vocab_list,
+    int alpha_size, bool multiWord) :
     multiWord(multiWord) {
       vocabulary = new Vocabulary(vocab_list);
 
-      trieRoot = new TrieNode(26);
-      for (std::vector<char> word : vocab_list) {
+      trieRoot = new TrieNode(alpha_size);
+      for (std::vector<int32> word : vocab_list) {
           trieRoot->Insert(word);
       }
     }
-  TrieBeamScorer(const char *dictionary_path, bool multiWord) :
+
+  TrieBeamScorer(const char *dictionary_path, int alpha_size, bool multiWord) :
     multiWord(multiWord) {
       vocabulary = new Vocabulary(dictionary_path);
-      std::vector<std::vector<char>> vocab_list = vocabulary->GetVocabList();
+      std::vector<std::vector<int32>> vocab_list = vocabulary->GetVocabList();
 
-      trieRoot = new TrieNode(26);
-      for (std::vector<char> word : vocab_list) {
+      trieRoot = new TrieNode(alpha_size);
+      for (std::vector<int32> word : vocab_list) {
         trieRoot->Insert(word);
       }
     }
+
   // State initialization
   void InitializeState(TrieBeamState* root) const override {
     root->incomplete_word_trie_node = trieRoot;
@@ -108,7 +112,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // expansion is done.
   void ExpandState(const TrieBeamState& from_state, int from_label,
                    TrieBeamState* to_state, int to_label) const override {
-   
+
     // Ensure that from state has a trie node
     // If from state does not have a trie node, then we return without a state expansion
     TrieNode *node;
@@ -127,7 +131,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
       node = to_state->incomplete_word_trie_node;
     }
 
-    // set the node to be the child of the 
+    // set the node to be the child of the
     node = node->GetChildAt(to_label);
     to_state->incomplete_word_trie_node = node;
     to_state->incomplete_word += to_label;
