@@ -165,6 +165,35 @@ class CTCDecodeHelper {
     return Status::OK();
   }
 
+  Status ValidateDictionaryArguments(OpKernelContext* ctx,
+          const Tensor** alphabet_size, const Tensor** dictionary, 
+          const Tensor** inputs) {
+    // populate dictionary with context value
+    Status status = ctx->input("dictionary", dictionary);
+    if (!status.ok()) return status;
+    status = ctx->input("alphabet_size", alphabet_size);
+    if (!status.ok()) return status;
+
+    const TensorShape& inputs_shape = (*inputs)->shape();
+    const int64 num_classes_raw = inputs_shape.dim_size(2);
+    auto alpha_sz_t = (*alphabet_size)->scalar<int32>()();
+
+    // validate alphabet size
+    if (num_classes_raw < alpha_sz_t) {
+        return errors::InvalidArgument(
+                "dictionary alphabet exceeds num_classes");
+    }
+
+    // Validate dictionary shape
+    const TensorShape& dictionary_shape = (*dictionary)->shape();
+    if (dictionary_shape.dims() != 2) {
+        return errors::InvalidArgument("dictionary is not a 2-Tensor");
+    }
+
+    return Status::OK();
+  }
+
+
  private:
   int top_paths_;
   TF_DISALLOW_COPY_AND_ASSIGN(CTCDecodeHelper);
@@ -368,11 +397,11 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
     OP_REQUIRES_OK(ctx, decode_helper_.ValidateInputsGenerateOutputs(
                             ctx, &inputs, &seq_len, &log_prob, &decoded_indices,
                             &decoded_values, &decoded_shape));
+    // ensure that additional dictionary arguments are okay
+    OP_REQUIRES_OK(ctx, decode_helper_.ValidateDictionaryArguments(
+                           ctx, &alphabet_size, &dictionary, &inputs));
 
-    // populate dictionary with context value
-    ctx->input("dictionary", &dictionary);
-    ctx->input("alphabet_size", &alphabet_size);
-
+    
     auto inputs_t = inputs->tensor<float, 3>();
     auto seq_len_t = seq_len->vec<int32>();
     auto alpha_sz_t = alphabet_size->scalar<int32>()();
@@ -384,8 +413,7 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
     const int64 max_time = inputs_shape.dim_size(0);
     const int64 batch_size = inputs_shape.dim_size(1);
     const int64 num_classes_raw = inputs_shape.dim_size(2);
-    // TF_RETURN_IF_ERROR();
-
+    
     OP_REQUIRES(
         ctx, FastBoundsCheck(num_classes_raw, std::numeric_limits<int>::max()),
         errors::InvalidArgument("num_classes cannot exceed max int"));
@@ -399,28 +427,10 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
       input_list_t.emplace_back(inputs_t.data() + t * batch_size * num_classes,
                                 batch_size, num_classes);
     }
-
-    /*
-    OP_REQURES_OK(ctx, decoder_helper_.ValidateDictionaryArguments(
-                           ctx, &alphabet_size, &dictionary, num_classes_raw));
-    */
-
-
-    // validate alphabet size
-    if (num_classes_raw < alpha_sz_t) {
-        errors::InvalidArgument("dictionary alphabet exceeds num_classes");
-    }
-
-    // Validate dictionary shape
-    const TensorShape& dictionary_shape = dictionary->shape();
-    std::cout << dictionary_shape << std::endl;
-    std::cout << dictionary_t << std::endl;
-    if (dictionary_shape.dims() != 2) {
-        errors::InvalidArgument("dictionary is not a 2-Tensor");
-    }
-
+    
     // construct vocabulary from input dictionary
     std::vector<std::vector<int32>> dictionary_vec;
+    const TensorShape& dictionary_shape = dictionary->shape();
     const int64 num_words = dictionary_shape.dim_size(0);
     const int64 max_len = dictionary_shape.dim_size(1);
     for (int w=0; w<num_words; ++w) {
