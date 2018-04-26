@@ -88,7 +88,7 @@ TEST(CtcBeamSearch, ScoreState) {
   const int num_classes = 4;
 
   std::vector<std::vector<int>> dictionary {{0, 1, 2}};
-  TrieBeamScorer scorer(dictionary, 26, false);
+  TrieBeamScorer scorer(dictionary, num_classes, false);
   CTCBeamSearchDecoder<TrieBeamState> decoder(
       num_classes, 10 * top_paths, &scorer);
 
@@ -141,14 +141,12 @@ TEST(CtcBeamSearch, DecodingWithAndWithoutDictionary) {
   CTCBeamSearchDecoder<>::DefaultBeamScorer default_scorer;
   CTCBeamSearchDecoder<> decoder(num_classes, 10 * top_paths, &default_scorer);
 
-  // Dictionary decoder, allowing only two dictionary words : {3}, {3, 1}.
-
   std::vector<std::vector<int>> dictionary {
       {1}, {1, 3}, {1, 3, 1}, {1, 3, 1, 3}, {1, 3, 1, 3, 1},
       {3}, {3, 1}, {3, 1, 3}, {3, 1, 3, 1}, {3, 1, 3, 1, 3}};
 
 
-  TrieBeamScorer dictionary_scorer(dictionary, 26, false);
+  TrieBeamScorer dictionary_scorer(dictionary, num_classes, false);
   CTCBeamSearchDecoder<TrieBeamState> dictionary_decoder(
       num_classes, 10 * top_paths, &dictionary_scorer);
 
@@ -226,7 +224,7 @@ TEST(CtcBeamSearch, DecodingWithRestrictDict) {
   // Dictionary decoder, allowing only two dictionary words : {3}, {3, 1}.
   std::vector<std::vector<int>> dictionary {{3}, {3, 1}};
 
-  TrieBeamScorer dictionary_scorer(dictionary, 229, false);
+  TrieBeamScorer dictionary_scorer(dictionary, num_classes, false);
   CTCBeamSearchDecoder<TrieBeamState> dictionary_decoder(
       num_classes, 10 * top_paths, &dictionary_scorer);
 
@@ -288,7 +286,11 @@ TEST(CtcBeamSearch, AllBeamElementsHaveFiniteScores) {
   const int num_classes = 6;
 
   // Plain decoder using hibernating beam search algorithm.
-  TrieBeamScorer dictionary_scorer(dictionary_path, 26, false);
+  std::vector<std::vector<int>> dictionary {
+      {1}, {1, 3}, {1, 3, 1}, {1, 3, 1, 3}, {1, 3, 1, 3, 1},
+      {3}, {3, 1}, {3, 1, 3}, {3, 1, 3, 1}, {3, 1, 3, 1, 3}};
+
+  TrieBeamScorer dictionary_scorer(dictionary, num_classes, false);
   CTCBeamSearchDecoder<TrieBeamState> decoder(num_classes, top_paths,
      &dictionary_scorer);
 
