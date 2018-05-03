@@ -1,8 +1,0 @@
-# Description:
-#   Contains op to run ctc with a trie-implemented dictionary-restricted framework
-
-license(["notice"])  # Apache 2.0
-
-exports_files(["LICENSE"])
-
-package(default_visibility = ["//visibility:public"])
