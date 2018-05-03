@@ -86,7 +86,8 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     multiWord(multiWord) {
       vocabulary = new Vocabulary(vocab_list);
 
-      trieRoot = new TrieNode(alpha_size);
+      // root has blank label and alphabet size
+      trieRoot = new TrieNode(alpha_size-1, alpha_size);
       for (std::vector<int32> word : vocab_list) {
           trieRoot->Insert(word);
       }
@@ -141,7 +142,8 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // and retrieving the TopN requested candidates. Called at most once per beam.
   void ExpandStateEnd(TrieBeamState* state) const override {
     if (!state->incomplete_word_trie_node->IsEnd()) {
-      ResetIncompleteWord(state);
+      state->incomplete_word.clear();
+      state->incomplete_word_trie_node = nullptr;
     }
   }
   // GetStateExpansionScore should be an inexpensive method to retrieve the
@@ -153,10 +155,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // there's no state expansion logic, the expansion score is zero.
   float GetStateExpansionScore(const TrieBeamState& state,
                                float previous_score) const override {
-    if (state.incomplete_word_trie_node == nullptr)
-      return -INFINITY;
-    return previous_score;
-    // return previous_score;
+    return state.incomplete_word_trie_node == nullptr ? -INFINITY : previous_score;
   }
   // GetStateEndExpansionScore should be an inexpensive method to retrieve the
   // (cached) expansion score computed within ExpandStateEnd. The score is
@@ -164,8 +163,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   //
   // The score returned should be a log-probability.
   float GetStateEndExpansionScore(const TrieBeamState& state) const override {
-    if (state.incomplete_word_trie_node == nullptr) return -INFINITY;
-    return 0;
+    return state.incomplete_word_trie_node == nullptr ? -INFINITY : 0;
   }
 
   TrieNode *GetTrieRoot() {
