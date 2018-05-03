@@ -116,6 +116,7 @@ class TrieNode {
       }
     }
 
+    // DEPRECATED... alter function to use specified vocabulary size
     static void ReadFromStream(std::ifstream& in, TrieNode* &obj) {
       obj->ReadNode(in);
 
