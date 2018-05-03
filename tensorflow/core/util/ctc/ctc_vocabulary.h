@@ -15,8 +15,8 @@ limitations under the License.
 
 /* Code adapted from https://github.com/timediv/tensorflow-with-kenlm */
 
-#ifndef TENSORFLOW_CURE_UTIL_CTC_CTC_VOCABULARY_H_
-#define TENSORFLOW_CURE_UTIL_CTC_CTC_VOCABULARY_H_
+#ifndef TENSORFLOW_CORE_UTIL_CTC_CTC_VOCABULARY_H_
+#define TENSORFLOW_CORE_UTIL_CTC_CTC_VOCABULARY_H_
 
 #include <fstream>
 #include <istream>
@@ -55,7 +55,7 @@ class Vocabulary {
     void PrintVocab() {
       for (std::vector<int32> word : vocabulary) {
         for (int wChar : word) {
-          if (wChar >= 0 && wChar <= 26) {
+          if (wChar >= 0 && wChar <= vocab_size) {
             std::cout << wChar << " ";
           }
         }
@@ -83,4 +83,4 @@ class Vocabulary {
 } // namespace ctc
 } // namespace tensorflow
 
-#endif // CTC_VOCABULARY_H
+#endif // TENSORFLOW_CORE_UTIL_CTC_CTC_VOCABULARY_H
