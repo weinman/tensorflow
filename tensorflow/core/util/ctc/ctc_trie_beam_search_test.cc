@@ -288,6 +288,71 @@ TEST(CtcBeamSearch, DecodingWithRestrictDict) {
   }
 }
 
+<<<<<<< HEAD
+TEST(CtcBeamSearch, DecodingWithEmptyDict) {
+  const int batch_size = 1;
+  const int timesteps = 5;
+  const int top_paths = 1;
+  const int num_classes = 6;
+
+  // Dictionary decoder, allowing only the empty word {}
+  std::vector<std::vector<int>> dictionary {{}};
+
+  TrieBeamScorer dictionary_scorer(dictionary, num_classes, false);
+  CTCBeamSearchDecoder<TrieBeamState> dictionary_decoder(
+      num_classes, 10 * top_paths, &dictionary_scorer);
+
+  // Raw data containers (arrays of floats, ints, etc.).
+  int sequence_lengths[batch_size] = {timesteps};
+  float input_data_mat[timesteps][batch_size][num_classes] = {
+      {{0, 0.6, 0, 0.4, 0, 0}},
+      {{0, 0.5, 0, 0.5, 0, 0}},
+      {{0, 0.4, 0, 0.6, 0, 0}},
+      {{0, 0.4, 0, 0.6, 0, 0}},
+      {{0, 0.4, 0, 0.6, 0, 0}}};
+
+  // The CTCDecoder works with log-probs.
+  for (int t = 0; t < timesteps; ++t) {
+    for (int b = 0; b < batch_size; ++b) {
+      for (int c = 0; c < num_classes; ++c) {
+        input_data_mat[t][b][c] = std::log(input_data_mat[t][b][c]);
+      }
+    }
+  }
+
+  // Dictionary outputs: preference for dictionary candidates. The
+  // second-candidate is there, despite it not being a dictionary word, due to
+  // stronger probability in the input to the decoder.
+  std::vector<CTCDecoder::Output> expected_dict_output = {
+      {{}},
+  };
+
+  // Convert data containers to the format accepted by the decoder, simply
+  // mapping the memory from the container to an Eigen::ArrayXi,::MatrixXf,
+  // using Eigen::Map.
+  Eigen::Map<const Eigen::ArrayXi> seq_len(&sequence_lengths[0], batch_size);
+  std::vector<Eigen::Map<const Eigen::MatrixXf>> inputs;
+  inputs.reserve(timesteps);
+  for (int t = 0; t < timesteps; ++t) {
+    inputs.emplace_back(&input_data_mat[t][0][0], batch_size, num_classes);
+  }
+
+  // Prepare containers scores.
+  float score[batch_size][top_paths] = {{0.0}};
+  Eigen::Map<Eigen::MatrixXf> scores(&score[0][0], batch_size, top_paths);
+
+  // Prepare dictionary outputs.
+  std::vector<CTCDecoder::Output> dict_outputs(top_paths);
+  for (CTCDecoder::Output& output : dict_outputs) {
+    output.resize(batch_size);
+  }
+  EXPECT_TRUE(
+      dictionary_decoder.Decode(seq_len, inputs, &dict_outputs, &scores).ok());
+  for (int path = 0; path < top_paths; ++path) {
+    EXPECT_EQ(dict_outputs[path][0], expected_dict_output[0][path]);
+  }
+}
+
 TEST(CtcBeamSearch, DecodingWithDisjointDict) {
   const int batch_size = 1;
   const int timesteps = 5;
