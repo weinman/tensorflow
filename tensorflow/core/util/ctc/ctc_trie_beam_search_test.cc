@@ -288,7 +288,6 @@ TEST(CtcBeamSearch, DecodingWithRestrictDict) {
   }
 }
 
-<<<<<<< HEAD
 TEST(CtcBeamSearch, DecodingWithEmptyDict) {
   const int batch_size = 1;
   const int timesteps = 5;
