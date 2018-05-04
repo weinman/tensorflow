@@ -208,18 +208,25 @@ TEST(CtcBeamSearch, DecodingWithAndWithoutDictionary) {
   for (CTCDecoder::Output& output : dict_outputs) {
     output.resize(batch_size);
   }
+  float dict_score[batch_size][top_paths] = {{0.0}};
+  Eigen::Map<Eigen::MatrixXf> dict_scores(&dict_score[0][0], batch_size, top_paths);
+  
   EXPECT_TRUE(
-      dictionary_decoder.Decode(seq_len, inputs, &dict_outputs, &scores).ok());
-
+      dictionary_decoder.Decode(seq_len, inputs, &dict_outputs, &dict_scores).ok());
   for (int path = 0; path < top_paths; ++path) {
     EXPECT_EQ(dict_outputs[path][0], expected_dict_output[0][path]);
+  }
+
+  // Ensure that dictionary scores are same as standard scores
+  for (int path = 0; path < top_paths; ++path) {
+    EXPECT_EQ(scores(path), dict_scores(path));
   }
 }
 
 TEST(CtcBeamSearch, DecodingWithRestrictDict) {
   const int batch_size = 1;
   const int timesteps = 5;
-  const int top_paths = 2;
+  const int top_paths = 3;
   const int num_classes = 6;
 
   // Dictionary decoder, allowing only two dictionary words : {3}, {3, 1}.
@@ -251,7 +258,7 @@ TEST(CtcBeamSearch, DecodingWithRestrictDict) {
   // second-candidate is there, despite it not being a dictionary word, due to
   // stronger probability in the input to the decoder.
   std::vector<CTCDecoder::Output> expected_dict_output = {
-      {{3, 1}, {3}},
+    {{3, 1}, {3}, {}},
   };
 
   // Convert data containers to the format accepted by the decoder, simply
@@ -276,6 +283,7 @@ TEST(CtcBeamSearch, DecodingWithRestrictDict) {
   EXPECT_TRUE(
       dictionary_decoder.Decode(seq_len, inputs, &dict_outputs, &scores).ok());
   for (int path = 0; path < top_paths; ++path) {
+    std::cout << scores(path) << std::endl;
     EXPECT_EQ(dict_outputs[path][0], expected_dict_output[0][path]);
   }
 }
@@ -283,11 +291,12 @@ TEST(CtcBeamSearch, DecodingWithRestrictDict) {
 TEST(CtcBeamSearch, DecodingWithDisjointDict) {
   const int batch_size = 1;
   const int timesteps = 5;
-  const int top_paths = 4;
+  const int top_paths = 8;
   const int num_classes = 6;
 
   // Dictionary decoder, allowing only empty word
-  std::vector<std::vector<int>> dictionary {{2, 2}, {2, 4}, {4, 2}, {4, 4}};
+  std::vector<std::vector<int>> dictionary {{2, 2}, {2, 4}, {4, 2}, {4, 4},
+                                            {3, 2}, {1, 3, 3, 2}, {2, 3, 1}};
 
   TrieBeamScorer dictionary_scorer(dictionary, num_classes, false);
   CTCBeamSearchDecoder<TrieBeamState> dictionary_decoder(
@@ -334,6 +343,9 @@ TEST(CtcBeamSearch, DecodingWithDisjointDict) {
   EXPECT_TRUE(
       dictionary_decoder.Decode(seq_len, inputs, &dict_outputs, &scores).ok());
   for (int path = 0; path < top_paths; ++path) {
+    for (auto i : dict_outputs[path][0])
+      std::cout << i;
+    std::cout << std::endl << scores(path) << std::endl;
     EXPECT_EQ((dict_outputs[path][0]).size(), 0);
   }
 }
