@@ -230,7 +230,7 @@ TEST(CtcBeamSearch, DecodingWithRestrictDict) {
   const int top_paths = 4;
   const int num_classes = 6;
 
-  // Dictionary decoder, allowing only two dictionary words : {3}, {3, 1}.
+  // Dictionary decoder, allowing only three dictionary words : {1}, {3}, {3, 1}.
   std::vector<std::vector<int>> dictionary {{3}, {3, 1}, {1}};
 
   TrieBeamScorer dictionary_scorer(dictionary, num_classes, false);

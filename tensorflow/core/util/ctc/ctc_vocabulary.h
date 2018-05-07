@@ -31,9 +31,9 @@ namespace ctc {
 class Vocabulary {
   public:
     Vocabulary(std::vector<std::vector<int32>> vocab_list, int alpha_size)
-    : vocab_size(vocab_list.size()),
-      vocabulary(vocab_list),
-      alphabet_size(alpha_size) {}
+    : alphabet_size(alpha_size),
+      vocab_size(vocab_list.size()),
+      vocabulary(vocab_list) {}
 
     Vocabulary(const char *vocab_path, int alpha_size)
     : alphabet_size(alpha_size) {
