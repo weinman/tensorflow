@@ -30,11 +30,13 @@ namespace ctc {
 
 class Vocabulary {
   public:
-    Vocabulary(std::vector<std::vector<int32>> vocab_list)
+    Vocabulary(std::vector<std::vector<int32>> vocab_list, int alpha_size)
     : vocab_size(vocab_list.size()),
-      vocabulary(vocab_list) {}
+      vocabulary(vocab_list),
+      alphabet_size(alpha_size) {}
 
-    Vocabulary(const char *vocab_path) {
+    Vocabulary(const char *vocab_path, int alpha_size)
+    : alphabet_size(alpha_size) {
       std::ifstream in(vocab_path);
       ReadFromFile(in);
       in.close();
@@ -42,6 +44,10 @@ class Vocabulary {
 
     ~Vocabulary() {
       vocabulary.clear();
+    }
+
+    bool inline IsBlankLabel(int label) const {
+      return label == alphabet_size;
     }
 
     int GetVocabSize() {
@@ -63,6 +69,7 @@ class Vocabulary {
     }
 
   private:
+    int alphabet_size;
     int vocab_size;
     std::vector<std::vector<int32>> vocabulary;
 

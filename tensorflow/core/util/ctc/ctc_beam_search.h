@@ -200,13 +200,15 @@ Status CTCBeamSearchDecoder<CTCBeamState, CTCBeamComparer>::Decode(
       return status;
     }
 
-    CHECK_EQ(top_n, beam_log_probabilities.size());
-    CHECK_EQ(beams.size(), beam_log_probabilities.size());
+    //CHECK_EQ(top_n, beam_log_probabilities.size());
+    //CHECK_EQ(beams.size(), beam_log_probabilities.size());
 
-    for (int i = 0; i < top_n; ++i) {
+    //for (int i = 0; i < top_n; ++i) {
+    for (int i = 0; i < beam_log_probabilities.size(); ++i) {
       // Copy output to the correct beam + batch
       (*output)[i][b].swap(beams[i]);
       (*scores)(b, i) = -beam_log_probabilities[i];
+      std::cout << (*scores)(b,i) << std::endl;
     }
   }  // for (int b...
   return Status::OK();
@@ -390,9 +392,12 @@ Status CTCBeamSearchDecoder<CTCBeamState, CTCBeamComparer>::TopPaths(
   CHECK_NOTNULL(paths)->clear();
   CHECK_NOTNULL(log_probs)->clear();
   if (n > beam_width_) {
+    std::cout << "n greater than beam width" << std::endl;
     return errors::InvalidArgument("requested more paths than the beam width.");
   }
+  n = n > leaves_.size() ? leaves_.size() : n;
   if (n > leaves_.size()) {
+    std::cout << "n greater than leaves size: " << leaves_.size() << std::endl;
     return errors::InvalidArgument(
         "Less leaves in the beam search than requested.");
   }
