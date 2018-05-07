@@ -84,7 +84,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   TrieBeamScorer(std::vector<std::vector<int32>> vocab_list,
     int alpha_size, bool multiWord) :
     multiWord(multiWord) {
-      vocabulary = new Vocabulary(vocab_list);
+      vocabulary = new Vocabulary(vocab_list, alpha_size);
 
       // root has blank label and alphabet size
       trieRoot = new TrieNode(alpha_size-1, alpha_size);
@@ -95,7 +95,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
 
   TrieBeamScorer(const char *dictionary_path, int alpha_size, bool multiWord) :
     multiWord(multiWord) {
-      vocabulary = new Vocabulary(dictionary_path);
+      vocabulary = new Vocabulary(dictionary_path, alpha_size);
       std::vector<std::vector<int32>> vocab_list = vocabulary->GetVocabList();
 
       trieRoot = new TrieNode(alpha_size);
@@ -132,10 +132,12 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
       node = to_state->incomplete_word_trie_node;
     }
 
-    // set the node to be the child of the
-    node = node->GetChildAt(to_label);
-    to_state->incomplete_word_trie_node = node;
-    to_state->incomplete_word += to_label;
+    // set the node to be the child of the current node
+    if (!vocabulary->IsBlankLabel(to_label)) {
+      node = node->GetChildAt(to_label);
+      to_state->incomplete_word_trie_node = node;
+      to_state->incomplete_word.push_back(to_label);
+    }
   }
   // ExpandStateEnd is called after decoding has finished. Its purpose is to
   // allow a final scoring of the beam in its current state, before resorting
@@ -155,7 +157,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // there's no state expansion logic, the expansion score is zero.
   float GetStateExpansionScore(const TrieBeamState& state,
                                float previous_score) const override {
-    return state.incomplete_word_trie_node == nullptr ? -INFINITY : previous_score;
+    return state.incomplete_word_trie_node == nullptr ? kLogZero : previous_score;
   }
   // GetStateEndExpansionScore should be an inexpensive method to retrieve the
   // (cached) expansion score computed within ExpandStateEnd. The score is
@@ -163,7 +165,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   //
   // The score returned should be a log-probability.
   float GetStateEndExpansionScore(const TrieBeamState& state) const override {
-    return state.incomplete_word_trie_node == nullptr ? -INFINITY : 0;
+    return state.incomplete_word_trie_node == nullptr ? kLogZero : 0;
   }
 
   TrieNode *GetTrieRoot() {

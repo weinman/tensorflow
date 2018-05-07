@@ -89,9 +89,7 @@ class TrieNode {
 
     TrieNode* GetChildAt(int32 label) {
       auto iter = children.find(label);
-      if (iter != children.end())
-        return iter->second;
-      return nullptr;
+      return iter != children.end() ? iter->second : nullptr;
     }
 
     std::vector<int32> GetTrieLabels() {
