@@ -44,6 +44,7 @@ struct EmptyBeamState {};
 struct TrieBeamState {
   TrieNode *incomplete_word_trie_node;
   std::vector<int> incomplete_word;
+  float score;
 };
 
 struct BeamProbability {
