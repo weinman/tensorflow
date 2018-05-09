@@ -139,7 +139,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
       node = node->GetChildAt(to_label);
       to_state->incomplete_word_trie_node = node;
       to_state->incomplete_word.push_back(to_label);
-      to_state->score = std::log(1.0);
+      to_state->score = node != nullptr ? std::log(1.0) : kLogZero;
     }
   }
   // ExpandStateEnd is called after decoding has finished. Its purpose is to
