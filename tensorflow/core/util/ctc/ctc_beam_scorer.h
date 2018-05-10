@@ -142,13 +142,6 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
       node = node->GetChildAt(to_label);
       to_state->incomplete_word_trie_node = node;
       to_state->incomplete_word.push_back(to_label);
-      if (node == nullptr) {
-        // for (int i = 0; i < to_state->incomplete_word.size(); ++i) {
-        //   std::cout << to_state->incomplete_word.at(i);
-        // }
-        // std::cout << std::endl;
-        to_state->score = kLogZero;
-      }
       to_state->score = node != nullptr ? std::log(1.0) : kLogZero;
     }
   }
@@ -156,10 +149,6 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // allow a final scoring of the beam in its current state, before resorting
   // and retrieving the TopN requested candidates. Called at most once per beam.
   void ExpandStateEnd(TrieBeamState* state) const override {
-    for (int l : state->incomplete_word) {
-      std::cout << l;
-    }
-    std::cout << std::endl;
     if (state->incomplete_word_trie_node == nullptr ||
         !state->incomplete_word_trie_node->IsEnd()) {
       state->incomplete_word.clear();
