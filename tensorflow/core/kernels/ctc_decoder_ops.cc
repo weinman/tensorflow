@@ -444,7 +444,7 @@ class CTCBeamSearchDecoderTrieOp : public OpKernel {
       dictionary_vec.push_back(word);
     }
 
-    ctc::TrieBeamScorer beam_scorer_(dictionary_vec, alpha_sz_t, true);
+    ctc::TrieBeamScorer beam_scorer_(dictionary_vec, alpha_sz_t, false);
     ctc::CTCBeamSearchDecoder<ctc::TrieBeamState> beam_search(num_classes,
                                                          beam_width_,
                                                          &beam_scorer_,
