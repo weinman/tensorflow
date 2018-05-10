@@ -183,6 +183,13 @@ Status CTCBeamSearchDecoder<CTCBeamState, CTCBeamComparer>::Decode(
       Step(input[t].row(b));
     }  // for (int t...
 
+    auto is_candidate = [this](const BeamProbability& prob) {
+      return (prob.total > kLogZero &&
+              (leaves_.size() < beam_width_ ||
+               prob.total > leaves_.peek_bottom()->newp.total));
+    };
+
+
     // O(n * log(n))
     std::unique_ptr<std::vector<BeamEntry*>> branches(leaves_.Extract());
     leaves_.Reset();
@@ -191,7 +198,8 @@ Status CTCBeamSearchDecoder<CTCBeamState, CTCBeamComparer>::Decode(
       beam_scorer_->ExpandStateEnd(&entry->state);
       entry->newp.total +=
           beam_scorer_->GetStateEndExpansionScore(entry->state);
-      leaves_.push(entry);
+      if (is_candidate(entry->newp))
+        leaves_.push(entry);
     }
 
     Status status =

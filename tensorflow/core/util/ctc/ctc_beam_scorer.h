@@ -127,6 +127,9 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
     // the from state is not null, copy it to the to state and expand appropriately
     CopyState(to_state, from_state);
 
+    if (from_label == to_label)
+      return;
+
     // If the the from state is at a leaf of the trie, then set the to state to
     // the root of the trie to expand from a new word
     if (node->IsEnd() && multiWord) {
@@ -139,6 +142,13 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
       node = node->GetChildAt(to_label);
       to_state->incomplete_word_trie_node = node;
       to_state->incomplete_word.push_back(to_label);
+      if (node == nullptr) {
+        // for (int i = 0; i < to_state->incomplete_word.size(); ++i) {
+        //   std::cout << to_state->incomplete_word.at(i);
+        // }
+        // std::cout << std::endl;
+        to_state->score = kLogZero;
+      }
       to_state->score = node != nullptr ? std::log(1.0) : kLogZero;
     }
   }
@@ -146,6 +156,10 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   // allow a final scoring of the beam in its current state, before resorting
   // and retrieving the TopN requested candidates. Called at most once per beam.
   void ExpandStateEnd(TrieBeamState* state) const override {
+    for (int l : state->incomplete_word) {
+      std::cout << l;
+    }
+    std::cout << std::endl;
     if (state->incomplete_word_trie_node == nullptr ||
         !state->incomplete_word_trie_node->IsEnd()) {
       state->incomplete_word.clear();
@@ -187,6 +201,7 @@ class TrieBeamScorer : public BaseBeamScorer<TrieBeamState> {
   void CopyState(TrieBeamState* to_state, const TrieBeamState& from_state) const {
     to_state->incomplete_word_trie_node = from_state.incomplete_word_trie_node;
     to_state->incomplete_word = from_state.incomplete_word;
+    to_state->score = from_state.score;
   }
 
   void ResetIncompleteWord(TrieBeamState* state) const {
