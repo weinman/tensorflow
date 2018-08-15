@@ -130,4 +130,51 @@ REGISTER_OP("CTCBeamSearchDecoder")
       return Status::OK();
     });
 
+REGISTER_OP("CTCBeamSearchDecoderTrie")
+    .Input("inputs: float")
+    .Input("sequence_length: int32")
+    .Input("alphabet_size: int32")
+    .Input("dictionary: int32")
+    .Attr("beam_width: int >= 1")
+    .Attr("top_paths: int >= 1")
+    .Attr("merge_repeated: bool = true")
+    .Output("decoded_indices: top_paths * int64")
+    .Output("decoded_values: top_paths * int64")
+    .Output("decoded_shape: top_paths * int64")
+    .Output("log_probability: float")
+    .SetShapeFn([](InferenceContext* c) {
+      ShapeHandle inputs;
+      ShapeHandle sequence_length;
+      ShapeHandle alphabet_size;
+      ShapeHandle dictionary;
+
+      TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 3, &inputs));
+      TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 1, &sequence_length));
+      TF_RETURN_IF_ERROR(c->WithRank(c->input(2), 0, &alphabet_size));
+      TF_RETURN_IF_ERROR(c->WithRank(c->input(3), 2, &dictionary));
+
+      // Get batch size from inputs and sequence_length.
+      DimensionHandle batch_size;
+      TF_RETURN_IF_ERROR(
+          c->Merge(c->Dim(inputs, 1), c->Dim(sequence_length, 0), &batch_size));
+
+      int32 top_paths;
+      TF_RETURN_IF_ERROR(c->GetAttr("top_paths", &top_paths));
+
+      // Outputs.
+      int out_idx = 0;
+      for (int i = 0; i < top_paths; ++i) {  // decoded_indices
+        c->set_output(out_idx++, c->Matrix(InferenceContext::kUnknownDim, 2));
+      }
+      for (int i = 0; i < top_paths; ++i) {  // decoded_values
+        c->set_output(out_idx++, c->Vector(InferenceContext::kUnknownDim));
+      }
+      ShapeHandle shape_v = c->Vector(2);
+      for (int i = 0; i < top_paths; ++i) {  // decoded_shape
+        c->set_output(out_idx++, shape_v);
+      }
+      c->set_output(out_idx++, c->Matrix(batch_size, top_paths));
+      return Status::OK();
+    });
+
 }  // namespace tensorflow

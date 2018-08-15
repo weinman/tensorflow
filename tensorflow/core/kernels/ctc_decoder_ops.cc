@@ -165,6 +165,35 @@ class CTCDecodeHelper {
     return Status::OK();
   }
 
+  Status ValidateDictionaryArguments(OpKernelContext* ctx,
+          const Tensor** alphabet_size, const Tensor** dictionary, 
+          const Tensor** inputs) {
+    // populate dictionary with context value
+    Status status = ctx->input("dictionary", dictionary);
+    if (!status.ok()) return status;
+    status = ctx->input("alphabet_size", alphabet_size);
+    if (!status.ok()) return status;
+
+    const TensorShape& inputs_shape = (*inputs)->shape();
+    const int64 num_classes_raw = inputs_shape.dim_size(2);
+    auto alpha_sz_t = (*alphabet_size)->scalar<int32>()();
+
+    // validate alphabet size
+    if (num_classes_raw < alpha_sz_t) {
+        return errors::InvalidArgument(
+                "dictionary alphabet exceeds num_classes");
+    }
+
+    // Validate dictionary shape
+    const TensorShape& dictionary_shape = (*dictionary)->shape();
+    if (dictionary_shape.dims() != 2) {
+        return errors::InvalidArgument("dictionary is not a 2-Tensor");
+    }
+
+    return Status::OK();
+  }
+
+
  private:
   int top_paths_;
   TF_DISALLOW_COPY_AND_ASSIGN(CTCDecodeHelper);
@@ -343,5 +372,124 @@ class CTCBeamSearchDecoderOp : public OpKernel {
 
 REGISTER_KERNEL_BUILDER(Name("CTCBeamSearchDecoder").Device(DEVICE_CPU),
                         CTCBeamSearchDecoderOp);
+
+// CTC beam search trie
+class CTCBeamSearchDecoderTrieOp : public OpKernel {
+ public:
+  explicit CTCBeamSearchDecoderTrieOp(OpKernelConstruction* ctx):
+   OpKernel(ctx) {
+    OP_REQUIRES_OK(ctx, ctx->GetAttr("merge_repeated", &merge_repeated_));
+    OP_REQUIRES_OK(ctx, ctx->GetAttr("beam_width", &beam_width_));
+    int top_paths;
+    OP_REQUIRES_OK(ctx, ctx->GetAttr("top_paths", &top_paths));
+    decode_helper_.SetTopPaths(top_paths);
+  }
+
+  void Compute(OpKernelContext* ctx) override {
+    const Tensor* inputs;
+    const Tensor* seq_len;
+    const Tensor* alphabet_size;
+    const Tensor* dictionary;
+    Tensor* log_prob = nullptr;
+    OpOutputList decoded_indices;
+    OpOutputList decoded_values;
+    OpOutputList decoded_shape;
+    OP_REQUIRES_OK(ctx, decode_helper_.ValidateInputsGenerateOutputs(
+                            ctx, &inputs, &seq_len, &log_prob, &decoded_indices,
+                            &decoded_values, &decoded_shape));
+    // ensure that additional dictionary arguments are okay
+    OP_REQUIRES_OK(ctx, decode_helper_.ValidateDictionaryArguments(
+                           ctx, &alphabet_size, &dictionary, &inputs));
+
+    
+    auto inputs_t = inputs->tensor<float, 3>();
+    auto seq_len_t = seq_len->vec<int32>();
+    auto alpha_sz_t = alphabet_size->scalar<int32>()();
+    auto dictionary_t = dictionary->tensor<int32, 2>();
+    auto log_prob_t = log_prob->matrix<float>();
+
+    const TensorShape& inputs_shape = inputs->shape();
+
+    const int64 max_time = inputs_shape.dim_size(0);
+    const int64 batch_size = inputs_shape.dim_size(1);
+    const int64 num_classes_raw = inputs_shape.dim_size(2);
+    
+    OP_REQUIRES(
+        ctx, FastBoundsCheck(num_classes_raw, std::numeric_limits<int>::max()),
+        errors::InvalidArgument("num_classes cannot exceed max int"));
+    const int num_classes = static_cast<const int>(num_classes_raw);
+
+    log_prob_t.setZero();
+
+    std::vector<TTypes<float>::UnalignedConstMatrix> input_list_t;
+
+    for (std::size_t t = 0; t < max_time; ++t) {
+      input_list_t.emplace_back(inputs_t.data() + t * batch_size * num_classes,
+                                batch_size, num_classes);
+    }
+    
+    // construct vocabulary from input dictionary
+    std::vector<std::vector<int32>> dictionary_vec;
+    const TensorShape& dictionary_shape = dictionary->shape();
+    const int64 num_words = dictionary_shape.dim_size(0);
+    const int64 max_len = dictionary_shape.dim_size(1);
+    for (int w=0; w<num_words; ++w) {
+      std::vector<int32> word;
+      for (int c=0; c <max_len; ++c) {
+        int32 val = dictionary_t(w,c);
+        if (val == 0)
+          break;
+        word.push_back(val);
+      }
+      dictionary_vec.push_back(word);
+    }
+
+    ctc::TrieBeamScorer beam_scorer_(dictionary_vec, alpha_sz_t, false);
+    ctc::CTCBeamSearchDecoder<ctc::TrieBeamState> beam_search(num_classes,
+                                                         beam_width_,
+                                                         &beam_scorer_,
+                                                         1 /* batch_size */,
+                                                         merge_repeated_);
+    Tensor input_chip(DT_FLOAT, TensorShape({num_classes}));
+    auto input_chip_t = input_chip.flat<float>();
+
+    std::vector<std::vector<std::vector<int> > > best_paths(batch_size);
+    std::vector<float> log_probs;
+
+    // Assumption: the blank index is num_classes - 1
+    for (int b = 0; b < batch_size; ++b) {
+      auto& best_paths_b = best_paths[b];
+      best_paths_b.resize(decode_helper_.GetTopPaths());
+      for (int t = 0; t < seq_len_t(b); ++t) {
+        input_chip_t = input_list_t[t].chip(b, 0);
+        auto input_bi =
+            Eigen::Map<const Eigen::ArrayXf>(input_chip_t.data(), num_classes);
+        beam_search.Step(input_bi);
+      }
+      OP_REQUIRES_OK(
+          ctx, beam_search.TopPaths(decode_helper_.GetTopPaths(), &best_paths_b,
+                                    &log_probs, merge_repeated_));
+
+      beam_search.Reset();
+
+      for (int bp = 0; bp < decode_helper_.GetTopPaths(); ++bp) {
+        log_prob_t(b, bp) = log_probs[bp];
+      }
+    }
+
+    OP_REQUIRES_OK(ctx, decode_helper_.StoreAllDecodedSequences(
+                            best_paths, &decoded_indices, &decoded_values,
+                            &decoded_shape));
+  }
+
+ private:
+  CTCDecodeHelper decode_helper_;
+  bool merge_repeated_;
+  int beam_width_;
+  TF_DISALLOW_COPY_AND_ASSIGN(CTCBeamSearchDecoderTrieOp);
+};
+
+REGISTER_KERNEL_BUILDER(Name("CTCBeamSearchDecoderTrie").Device(DEVICE_CPU),
+                        CTCBeamSearchDecoderTrieOp);
 
 }  // end namespace tensorflow

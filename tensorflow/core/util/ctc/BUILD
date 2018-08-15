@@ -18,6 +18,8 @@ filegroup(
         "ctc_beam_search.h",
         "ctc_decoder.h",
         "ctc_loss_util.h",
+        "ctc_trie_node.h",
+        "ctc_vocabulary.h",
     ],
 )
 
@@ -41,12 +43,16 @@ cc_library(
         "ctc_beam_scorer.h",
         "ctc_beam_search.h",
         "ctc_decoder.h",
+        "ctc_trie_node.h",
+        "ctc_vocabulary.h",
     ],
     hdrs = [
         "ctc_beam_entry.h",
         "ctc_beam_scorer.h",
         "ctc_beam_search.h",
         "ctc_decoder.h",
+        "ctc_trie_node.h",
+        "ctc_vocabulary.h",
     ],
     deps = [
         ":ctc_loss_util_lib",
@@ -56,11 +62,55 @@ cc_library(
     ],
 )
 
+cc_binary(
+    name = "ctc_generate_trie",
+    srcs = [
+        "ctc_generate_trie.cc",
+        "ctc_trie_node.h",
+        "ctc_vocabulary.h",
+    ],
+    deps = [
+        "//tensorflow/core:lib",
+        "//tensorflow/core:lib_internal",
+    ],
+    copts = ['-fexceptions', '-std=c++11'],
+    linkopts = ['-lm'],
+)
+
 tf_cc_tests(
     name = "ctc_beam_search_test",
     size = "small",
     srcs = [
         "ctc_beam_search_test.cc",
+    ],
+    deps = [
+        ":ctc_beam_search_lib",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
+    ],
+)
+
+tf_cc_tests(
+    name = "ctc_trie_node_test",
+    size = "small",
+    srcs = [
+        "ctc_trie_node_test.cc",
+        "ctc_trie_node.h"
+    ],
+    deps = [
+        ":ctc_beam_search_lib",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
+    ],
+)
+
+tf_cc_tests(
+    name = "ctc_trie_beam_search_test",
+    size = "small",
+    srcs = [
+        "ctc_trie_beam_search_test.cc",
     ],
     deps = [
         ":ctc_beam_search_lib",

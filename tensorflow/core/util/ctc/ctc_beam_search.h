@@ -183,6 +183,13 @@ Status CTCBeamSearchDecoder<CTCBeamState, CTCBeamComparer>::Decode(
       Step(input[t].row(b));
     }  // for (int t...
 
+    auto is_candidate = [this](const BeamProbability& prob) {
+      return (prob.total > kLogZero &&
+              (leaves_.size() < beam_width_ ||
+               prob.total > leaves_.peek_bottom()->newp.total));
+    };
+
+
     // O(n * log(n))
     std::unique_ptr<std::vector<BeamEntry*>> branches(leaves_.Extract());
     leaves_.Reset();
@@ -191,7 +198,8 @@ Status CTCBeamSearchDecoder<CTCBeamState, CTCBeamComparer>::Decode(
       beam_scorer_->ExpandStateEnd(&entry->state);
       entry->newp.total +=
           beam_scorer_->GetStateEndExpansionScore(entry->state);
-      leaves_.push(entry);
+      if (is_candidate(entry->newp))
+        leaves_.push(entry);
     }
 
     Status status =
@@ -200,10 +208,11 @@ Status CTCBeamSearchDecoder<CTCBeamState, CTCBeamComparer>::Decode(
       return status;
     }
 
-    CHECK_EQ(top_n, beam_log_probabilities.size());
-    CHECK_EQ(beams.size(), beam_log_probabilities.size());
+    //CHECK_EQ(top_n, beam_log_probabilities.size());
+    //CHECK_EQ(beams.size(), beam_log_probabilities.size());
 
-    for (int i = 0; i < top_n; ++i) {
+    //for (int i = 0; i < top_n; ++i) {
+    for (int i = 0; i < beam_log_probabilities.size(); ++i) {
       // Copy output to the correct beam + batch
       (*output)[i][b].swap(beams[i]);
       (*scores)(b, i) = -beam_log_probabilities[i];
@@ -392,6 +401,7 @@ Status CTCBeamSearchDecoder<CTCBeamState, CTCBeamComparer>::TopPaths(
   if (n > beam_width_) {
     return errors::InvalidArgument("requested more paths than the beam width.");
   }
+  n = n > leaves_.size() ? leaves_.size() : n;
   if (n > leaves_.size()) {
     return errors::InvalidArgument(
         "Less leaves in the beam search than requested.");

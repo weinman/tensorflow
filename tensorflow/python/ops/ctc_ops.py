@@ -282,7 +282,26 @@ def ctc_beam_search_decoder(inputs, sequence_length, beam_width=100,
       log_probabilities)
 
 
+@tf_export("nn.ctc_beam_search_decoder_trie")
+def ctc_beam_search_decoder_trie(inputs, sequence_length, alphabet_size, 
+                                 dictionary, beam_width=100, top_paths=1,
+                                 merge_repeated=True):
+  decoded_ixs, decoded_vals, decoded_shapes, log_probabilities = (
+      gen_ctc_ops.ctc_beam_search_decoder_trie(
+          inputs, sequence_length, alphabet_size, dictionary, 
+          beam_width=beam_width, top_paths=top_paths,
+          merge_repeated=merge_repeated))
+
+  return (
+      [sparse_tensor.SparseTensor(ix, val, shape) for (ix, val, shape)
+       in zip(decoded_ixs, decoded_vals, decoded_shapes)],
+      log_probabilities)
+
+
 ops.NotDifferentiable("CTCGreedyDecoder")
 
 
 ops.NotDifferentiable("CTCBeamSearchDecoder")
+
+
+ops.NotDifferentiable("CTCBeamSearchDecoderTrie")
